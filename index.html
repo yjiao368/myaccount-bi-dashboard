@@ -64,7 +64,7 @@
       const base = product === "All Products" ? 1 : 0.25;
       return months.map((m, i) => ({
         month: m,
-        adoptionRate: Math.round((12 + i * 3.5) * base + rng() * 5),
+        engagementRate: Math.round((12 + i * 3.5) * base + rng() * 5),
         users: Math.round((850 + i * 220) * base + rng() * 100),
         logins: Math.round((1200 + i * 350) * base + rng() * 200),
       }));
@@ -402,9 +402,11 @@
       const totalUsers = Math.round(7040 * mult);
       const newAccounts = Math.round(1280 * mult);
       const logins = Math.round(12400 * mult);
-      const adoptionPct = selectedProduct === "All Products" ? 28.4 : (15 + rng() * 20).toFixed(1);
-      const loginRate = selectedProduct === "All Products" ? 72.1 : (55 + rng() * 25).toFixed(1);
+      const engagementPct = selectedProduct === "All Products" ? 28.4 : (15 + rng() * 20).toFixed(1);
+      const multiPagePct = selectedProduct === "All Products" ? 42.3 : (30 + rng() * 20).toFixed(1);
       const loginsPerUser = selectedProduct === "All Products" ? 1.76 : (1.2 + rng() * 0.8).toFixed(2);
+      // Total account holders (denominator for Portal Engagement Rate)
+      const totalAccountHolders = selectedProduct === "All Products" ? 24800 : Math.round(24800 * (0.1 + rng() * 0.2));
       const totalPageViews = pageViewData.reduce((s, d) => s + d.views, 0);
       const avgPagesPerSession = (totalPageViews / (logins || 1)).toFixed(1);
       const sortedPages = [...pageViewData].sort((a, b) => b.views - a.views);
@@ -436,7 +438,7 @@
           }}>
             <div>
               <h1 style={{ color: COLORS.white, fontSize: 22, fontWeight: 700, margin: 0 }}>MyAccount BI Dashboard</h1>
-              <span style={{ color: "#94A3B8", fontSize: 13 }}>V1 Prototype — Adoption, Page Navigation & User Attribution</span>
+              <span style={{ color: "#94A3B8", fontSize: 13 }}>V1 Prototype — Portal Engagement, Page Navigation & User Attribution</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ color: "#94A3B8", fontSize: 12, fontWeight: 600 }}>PRODUCT:</span>
@@ -487,22 +489,36 @@
             {/* ═══════════ OVERVIEW TAB ═══════════ */}
             {activeTab === "Overview" && (
               <>
-                <SectionHeader title="Adoption & Engagement KPIs" subtitle={`Showing: ${selectedProduct}`} />
+                <SectionHeader title="Portal Engagement KPIs" subtitle={`Showing: ${selectedProduct} — Portal Engagement = page-viewing users / total account holders`} />
+                {/* Info banner explaining the metric */}
+                <div style={{
+                  background: "#EFF6FF",
+                  border: "1px solid #BFDBFE",
+                  borderRadius: 8,
+                  padding: "12px 16px",
+                  marginBottom: 20,
+                  fontSize: 13,
+                  color: "#1E40AF",
+                  lineHeight: 1.5,
+                }}>
+                  <strong>Portal Engagement Rate</strong> = unique users who viewed ≥1 page in MyAccount / total account holders.
+                  Login-based adoption is ~100% (users must log in to use purchased products), so we measure page-view engagement instead.
+                </div>
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                  <KPITile label="Adoption Rate" value={`${adoptionPct}%`} trend={4.2} />
-                  <KPITile label="MyAccount Users" value={totalUsers.toLocaleString()} trend={8.1} />
+                  <KPITile label="Portal Engagement Rate" value={`${engagementPct}%`} subvalue={`${totalUsers.toLocaleString()} of ${totalAccountHolders.toLocaleString()} acct holders`} trend={4.2} />
+                  <KPITile label="Active Users" value={totalUsers.toLocaleString()} subvalue="viewed ≥1 page" trend={8.1} />
                   <KPITile label="New Accounts" value={newAccounts.toLocaleString()} trend={12.3} />
-                  <KPITile label="Successful Logins" value={logins.toLocaleString()} trend={6.7} />
-                  <KPITile label="Login Rate" value={`${loginRate}%`} trend={2.1} />
+                  <KPITile label="Multi-Page Rate" value={`${multiPagePct}%`} subvalue="visited 2+ pages" trend={5.6} />
                   <KPITile label="Logins / User" value={loginsPerUser} trend={-0.8} />
+                  <KPITile label="Most Visited Page" value={mostVisitedPage} />
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 24 }}>
                   <Card>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Adoption Rate Over Time</h3>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Portal Engagement Rate Over Time</h3>
                     <SimpleLineChart
                       data={trendData}
-                      dataKeys={["adoptionRate"]}
+                      dataKeys={["engagementRate"]}
                       colors={[PRODUCT_COLORS[selectedProduct]]}
                       labelKey="month"
                       unit="%"
@@ -510,7 +526,7 @@
                   </Card>
 
                   <Card>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>MyAccount Users Over Time</h3>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>MyAccount Active Users Over Time</h3>
                     <SimpleBarChart
                       data={trendData}
                       dataKey="users"
@@ -521,9 +537,26 @@
                   </Card>
                 </div>
 
+                {/* Page Engagement Breakdown — NEW */}
+                <Card style={{ marginTop: 20 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 4px" }}>Page Engagement Rate by Page</h3>
+                  <p style={{ fontSize: 12, color: COLORS.muted, margin: "0 0 16px" }}>Of MyAccount visitors, what % visit each page? (Critical for monetization placement decisions)</p>
+                  <SimpleBarChart
+                    data={pageViewData.map(d => ({
+                      page: d.page,
+                      rate: +((d.uniqueVisitors / (totalUsers || 1)) * 100).toFixed(1),
+                    })).sort((a, b) => b.rate - a.rate)}
+                    dataKey="rate"
+                    labelKey="page"
+                    fill={PRODUCT_COLORS[selectedProduct]}
+                    layout="vertical"
+                    height={260}
+                  />
+                </Card>
+
                 {selectedProduct === "All Products" && (
                   <Card style={{ marginTop: 20 }}>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Adoption Rate by Product</h3>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Portal Engagement Rate by Product</h3>
                     <SimpleBarChart
                       data={productAdoptionData}
                       dataKey="rate"
@@ -573,6 +606,26 @@
                     />
                   </Card>
                 </div>
+
+                {/* Page Engagement Rate per Page */}
+                <Card style={{ marginTop: 20 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 4px" }}>Page Engagement Rate by Page</h3>
+                  <p style={{ fontSize: 12, color: COLORS.muted, margin: "0 0 16px" }}>Unique visitors to each page / total MyAccount visitors — which pages have traction?</p>
+                  <SimpleBarChart
+                    data={pageViewData.map(d => ({
+                      page: d.page,
+                      rate: +((d.uniqueVisitors / (totalUsers || 1)) * 100).toFixed(1),
+                    })).sort((a, b) => b.rate - a.rate)}
+                    dataKey="rate"
+                    labelKey="page"
+                    fill={(d, i) => {
+                      const pageColors = ["#1B3A5C", "#2E75B6", "#27AE60", "#F39C12", "#9B59B6", "#E74C3C"];
+                      return pageColors[i % pageColors.length];
+                    }}
+                    layout="vertical"
+                    height={260}
+                  />
+                </Card>
 
                 <Card style={{ marginTop: 20 }}>
                   <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Page Views Over Time (by Page)</h3>
@@ -716,7 +769,7 @@
 
           {/* Footer */}
           <div style={{ textAlign: "center", padding: "24px 32px", color: COLORS.muted, fontSize: 12, borderTop: `1px solid ${COLORS.border}`, marginTop: 40 }}>
-            MyAccount BI Dashboard V1 Prototype — Data shown is illustrative (mock data) — Prepared for stakeholder review
+            MyAccount BI Dashboard V1 Prototype — Data shown is illustrative (mock data) — Portal Engagement = page-viewing users / account holders — Prepared for stakeholder review
           </div>
         </div>
       );
