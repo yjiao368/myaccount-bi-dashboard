@@ -49,6 +49,8 @@
       { key: "security", label: "Security & Privacy", etype: "account-security" },
     ];
 
+    const GRANULARITY_OPTIONS = ["Monthly", "Weekly", "Daily"];
+
     // ── Mock data generators (seeded for consistency) ──
     function seededRandom(seed) {
       let s = seed;
@@ -58,11 +60,18 @@
       };
     }
 
-    const generateTrendData = (product) => {
-      const rng = seededRandom(product.length * 7 + 42);
-      const months = ["Sep", "Oct", "Nov", "Dec", "Jan", "Feb"];
+    const generateTrendData = (product, granularity) => {
+      const rng = seededRandom(product.length * 7 + 42 + granularity.length);
       const base = product === "All Products" ? 1 : 0.25;
-      return months.map((m, i) => ({
+      let labels;
+      if (granularity === "Daily") {
+        labels = ["Feb 20", "Feb 21", "Feb 22", "Feb 23", "Feb 24", "Feb 25", "Feb 26"];
+      } else if (granularity === "Weekly") {
+        labels = ["W1 Jan", "W2 Jan", "W3 Jan", "W4 Jan", "W1 Feb", "W2 Feb", "W3 Feb", "W4 Feb"];
+      } else {
+        labels = ["Sep", "Oct", "Nov", "Dec", "Jan", "Feb"];
+      }
+      return labels.map((m, i) => ({
         month: m,
         engagementRate: Math.round((12 + i * 3.5) * base + rng() * 5),
         users: Math.round((850 + i * 220) * base + rng() * 100),
@@ -80,11 +89,18 @@
       }));
     };
 
-    const generatePageTrendData = (product) => {
-      const rng = seededRandom(product.length * 5 + 77);
-      const months = ["Sep", "Oct", "Nov", "Dec", "Jan", "Feb"];
+    const generatePageTrendData = (product, granularity) => {
+      const rng = seededRandom(product.length * 5 + 77 + granularity.length);
       const mult = product === "All Products" ? 1 : 0.3;
-      return months.map((m, i) => ({
+      let labels;
+      if (granularity === "Daily") {
+        labels = ["Feb 20", "Feb 21", "Feb 22", "Feb 23", "Feb 24", "Feb 25", "Feb 26"];
+      } else if (granularity === "Weekly") {
+        labels = ["W1 Jan", "W2 Jan", "W3 Jan", "W4 Jan", "W1 Feb", "W2 Feb", "W3 Feb", "W4 Feb"];
+      } else {
+        labels = ["Sep", "Oct", "Nov", "Dec", "Jan", "Feb"];
+      }
+      return labels.map((m, i) => ({
         month: m,
         Home: Math.round((600 + i * 80 + rng() * 150) * mult),
         "Manage Products": Math.round((400 + i * 65 + rng() * 100) * mult),
@@ -121,13 +137,30 @@
       { name: "3+ Products", value: 580, color: "#1B3A5C" },
     ];
 
+    // Generate comparison table data (Monthly: Month × Product)
+    const generateComparisonData = () => {
+      const months = ["Oct 2025", "Nov 2025", "Dec 2025", "Jan 2026", "Feb 2026"];
+      const products = PRODUCTS.filter(p => p !== "All Products");
+      const rows = [];
+      const rng = seededRandom(555);
+      products.forEach(prod => {
+        months.forEach((month, mi) => {
+          const totalHolders = Math.round((2000 + rng() * 4000));
+          const activeUsers = Math.round(totalHolders * (0.15 + mi * 0.03 + rng() * 0.08));
+          const rate = ((activeUsers / totalHolders) * 100).toFixed(1);
+          rows.push({ month, product: prod, activeUsers, totalHolders, rate });
+        });
+      });
+      return rows;
+    };
+
     // ═══════════════════════════════════════════════
     // PURE SVG CHART COMPONENTS (no external library)
     // ═══════════════════════════════════════════════
 
-    function SimpleBarChart({ data, dataKey, labelKey, fill, width = "100%", height = 260, layout = "vertical" }) {
+    function SimpleBarChart({ data, dataKey, labelKey, fill, width = "100%", height = 260, layout = "vertical", unit = "" }) {
       const maxVal = Math.max(...data.map(d => d[dataKey]));
-      const padding = { top: 20, right: 40, bottom: 30, left: layout === "vertical" ? 120 : 40 };
+      const padding = { top: 20, right: 50, bottom: 30, left: layout === "vertical" ? 120 : 40 };
       const svgH = height;
       const svgW = 560;
       const chartW = svgW - padding.left - padding.right;
@@ -135,7 +168,6 @@
 
       if (layout === "vertical") {
         const barH = Math.min(28, (chartH - data.length * 4) / data.length);
-        const totalBarsH = data.length * (barH + 4);
         return (
           <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: "100%", height: height }}>
             {data.map((d, i) => {
@@ -145,7 +177,7 @@
                 <g key={i}>
                   <text x={padding.left - 8} y={y + barH / 2 + 4} textAnchor="end" fontSize="11" fill={COLORS.text}>{d[labelKey]}</text>
                   <rect x={padding.left} y={y} width={w} height={barH} rx="4" fill={typeof fill === "function" ? fill(d, i) : fill} />
-                  <text x={padding.left + w + 6} y={y + barH / 2 + 4} fontSize="11" fill={COLORS.muted}>{d[dataKey].toLocaleString()}</text>
+                  <text x={padding.left + w + 6} y={y + barH / 2 + 4} fontSize="11" fill={COLORS.muted}>{d[dataKey].toLocaleString()}{unit}</text>
                 </g>
               );
             })}
@@ -158,7 +190,6 @@
       const gap = (chartW - data.length * barW) / (data.length + 1);
       return (
         <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: "100%", height: height }}>
-          {/* Grid lines */}
           {[0, 0.25, 0.5, 0.75, 1].map((frac, i) => (
             <g key={i}>
               <line x1={padding.left} x2={svgW - padding.right} y1={padding.top + chartH * (1 - frac)} y2={padding.top + chartH * (1 - frac)} stroke="#E2E8F0" strokeDasharray="3 3" />
@@ -196,7 +227,6 @@
 
       return (
         <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: "100%", height: height }}>
-          {/* Grid lines */}
           {[0, 0.25, 0.5, 0.75, 1].map((frac, i) => {
             const val = minVal + range * frac;
             return (
@@ -206,11 +236,9 @@
               </g>
             );
           })}
-          {/* X labels */}
           {data.map((d, i) => (
             <text key={i} x={getX(i)} y={svgH - 8} textAnchor="middle" fontSize="10" fill={COLORS.text}>{d[labelKey]}</text>
           ))}
-          {/* Lines */}
           {dataKeys.map((key, ki) => {
             const points = data.map((d, i) => `${getX(i)},${getY(d[key])}`).join(" ");
             return (
@@ -388,29 +416,132 @@
       );
     }
 
+    // ── Pill Toggle (for granularity & page selector) ──
+    function PillToggle({ options, selected, onChange, multi = false }) {
+      return (
+        <div style={{ display: "flex", gap: 0, background: "#F1F5F9", borderRadius: 8, padding: 3, flexWrap: "wrap" }}>
+          {options.map((opt) => {
+            const isActive = multi ? selected.includes(opt) : selected === opt;
+            return (
+              <button
+                key={opt}
+                onClick={() => {
+                  if (multi) {
+                    if (opt === "All") {
+                      onChange(["All"]);
+                    } else {
+                      let next = selected.includes(opt)
+                        ? selected.filter(s => s !== opt)
+                        : [...selected.filter(s => s !== "All"), opt];
+                      if (next.length === 0) next = ["All"];
+                      onChange(next);
+                    }
+                  } else {
+                    onChange(opt);
+                  }
+                }}
+                style={{
+                  padding: "6px 14px",
+                  border: "none",
+                  borderRadius: 6,
+                  background: isActive ? COLORS.white : "transparent",
+                  color: isActive ? COLORS.accent : COLORS.muted,
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize: 12,
+                  cursor: "pointer",
+                  boxShadow: isActive ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                  transition: "all 0.15s",
+                }}
+              >
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // ── Three-Tier Engagement Model Card ──
+    function ThreeTierCard({ engagementPct, pageEngagementTop, multiPagePct }) {
+      const tiers = [
+        {
+          tier: "1. Reach",
+          metric: "Portal Engagement Rate",
+          value: `${engagementPct}%`,
+          desc: "% of account holders visiting the portal",
+          color: "#2E75B6",
+          bg: "#EFF6FF",
+        },
+        {
+          tier: "2. Depth",
+          metric: "Page Engagement Rate",
+          value: pageEngagementTop,
+          desc: "Which pages have traction (top page shown)",
+          color: "#27AE60",
+          bg: "#ECFDF5",
+        },
+        {
+          tier: "3. Intent",
+          metric: "Multi-Page Engagement Rate",
+          value: `${multiPagePct}%`,
+          desc: "Users visiting 2+ pages (cross-sell signal)",
+          color: "#F39C12",
+          bg: "#FFFBEB",
+        },
+      ];
+      return (
+        <Card style={{ marginTop: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 4px" }}>Three-Tier Engagement Model</h3>
+          <p style={{ fontSize: 12, color: COLORS.muted, margin: "0 0 16px" }}>Progressively deeper signals for monetization readiness</p>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            {tiers.map((t, i) => (
+              <div key={i} style={{
+                flex: "1 1 0",
+                minWidth: 200,
+                background: t.bg,
+                borderRadius: 10,
+                padding: "16px 20px",
+                borderLeft: `4px solid ${t.color}`,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: t.color, textTransform: "uppercase", letterSpacing: 0.5 }}>{t.tier}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginTop: 4 }}>{t.metric}</div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: COLORS.primary, marginTop: 6 }}>{t.value}</div>
+                <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4 }}>{t.desc}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      );
+    }
+
     // ── Main Dashboard ──
     function Dashboard() {
       const [selectedProduct, setSelectedProduct] = useState("All Products");
       const [activeTab, setActiveTab] = useState("Overview");
+      const [granularity, setGranularity] = useState("Monthly");
+      const [selectedPages, setSelectedPages] = useState(["All"]);
 
-      const trendData = useMemo(() => generateTrendData(selectedProduct), [selectedProduct]);
+      const trendData = useMemo(() => generateTrendData(selectedProduct, granularity), [selectedProduct, granularity]);
       const pageViewData = useMemo(() => generatePageViewData(selectedProduct), [selectedProduct]);
-      const pageTrendData = useMemo(() => generatePageTrendData(selectedProduct), [selectedProduct]);
+      const pageTrendData = useMemo(() => generatePageTrendData(selectedProduct, granularity), [selectedProduct, granularity]);
+      const comparisonData = useMemo(() => generateComparisonData(), []);
 
       const rng = seededRandom(selectedProduct.length * 3 + 11);
       const mult = selectedProduct === "All Products" ? 1 : 0.22 + rng() * 0.1;
       const totalUsers = Math.round(7040 * mult);
       const newAccounts = Math.round(1280 * mult);
       const logins = Math.round(12400 * mult);
-      const engagementPct = selectedProduct === "All Products" ? 28.4 : (15 + rng() * 20).toFixed(1);
-      const multiPagePct = selectedProduct === "All Products" ? 42.3 : (30 + rng() * 20).toFixed(1);
-      const loginsPerUser = selectedProduct === "All Products" ? 1.76 : (1.2 + rng() * 0.8).toFixed(2);
-      // Total account holders (denominator for Portal Engagement Rate)
+      const engagementPct = selectedProduct === "All Products" ? 28.4 : +(15 + rng() * 20).toFixed(1);
+      const multiPagePct = selectedProduct === "All Products" ? 42.3 : +(30 + rng() * 20).toFixed(1);
+      const loginsPerUser = selectedProduct === "All Products" ? 1.76 : +(1.2 + rng() * 0.8).toFixed(2);
       const totalAccountHolders = selectedProduct === "All Products" ? 24800 : Math.round(24800 * (0.1 + rng() * 0.2));
       const totalPageViews = pageViewData.reduce((s, d) => s + d.views, 0);
       const avgPagesPerSession = (totalPageViews / (logins || 1)).toFixed(1);
       const sortedPages = [...pageViewData].sort((a, b) => b.views - a.views);
       const mostVisitedPage = sortedPages[0]?.page || "Home";
+
+      // Page engagement data for three-tier card
+      const pageEngTop = sortedPages[0] ? `${((sortedPages[0].uniqueVisitors / (totalUsers || 1)) * 100).toFixed(1)}%` : "N/A";
 
       const productAdoptionData = useMemo(() => {
         const rng2 = seededRandom(101);
@@ -420,11 +551,35 @@
         }));
       }, []);
 
+      // Filtered comparison data
+      const filteredComparison = useMemo(() => {
+        if (selectedProduct === "All Products") return comparisonData;
+        return comparisonData.filter(r => r.product === selectedProduct);
+      }, [selectedProduct, comparisonData]);
+
       const PAGE_LINE_COLORS = ["#1B3A5C", "#2E75B6", "#27AE60", "#F39C12", "#9B59B6", "#E74C3C"];
       const PAGE_NAMES = ["Home", "Manage Products", "Subscriptions", "Payment Info", "Manage Account", "Security & Privacy"];
       const STACK_KEYS = ["home", "products", "subscriptions", "billing", "account", "security"];
       const STACK_COLORS = ["#1B3A5C", "#2E75B6", "#27AE60", "#F39C12", "#9B59B6", "#E74C3C"];
       const STACK_LABELS = ["Home", "Products", "Subscriptions", "Billing", "Account", "Security"];
+
+      // Page filter logic for Page Navigation tab
+      const filteredPageViewData = useMemo(() => {
+        if (selectedPages.includes("All")) return pageViewData;
+        return pageViewData.filter(d => selectedPages.includes(d.page));
+      }, [pageViewData, selectedPages]);
+
+      const filteredPageTrendKeys = useMemo(() => {
+        if (selectedPages.includes("All")) return PAGE_NAMES;
+        return PAGE_NAMES.filter(n => selectedPages.includes(n));
+      }, [selectedPages]);
+
+      const filteredPageTrendColors = useMemo(() => {
+        if (selectedPages.includes("All")) return PAGE_LINE_COLORS;
+        return PAGE_NAMES.map((n, i) => ({ name: n, color: PAGE_LINE_COLORS[i] }))
+          .filter(x => selectedPages.includes(x.name))
+          .map(x => x.color);
+      }, [selectedPages]);
 
       return (
         <div style={{ background: "#F1F5F9", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
@@ -435,41 +590,61 @@
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 12,
           }}>
             <div>
               <h1 style={{ color: COLORS.white, fontSize: 22, fontWeight: 700, margin: 0 }}>MyAccount BI Dashboard</h1>
               <span style={{ color: "#94A3B8", fontSize: 13 }}>V1 Prototype — Portal Engagement, Page Navigation & User Attribution</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ color: "#94A3B8", fontSize: 12, fontWeight: 600 }}>PRODUCT:</span>
-              <select
-                value={selectedProduct}
-                onChange={(e) => setSelectedProduct(e.target.value)}
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 8,
-                  border: "1px solid #475569",
-                  background: "#1E293B",
-                  color: COLORS.white,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  minWidth: 160,
-                }}
-              >
-                {PRODUCTS.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-              <div style={{
-                background: "#1E293B",
-                padding: "8px 14px",
-                borderRadius: 8,
-                border: "1px solid #475569",
-                color: "#94A3B8",
-                fontSize: 13,
-              }}>
-                Last 90 days
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              {/* Granularity Toggle */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ color: "#94A3B8", fontSize: 12, fontWeight: 600 }}>PERIOD:</span>
+                <div style={{ display: "flex", gap: 0, background: "#1E293B", borderRadius: 8, padding: 3 }}>
+                  {GRANULARITY_OPTIONS.map((g) => (
+                    <button
+                      key={g}
+                      onClick={() => setGranularity(g)}
+                      style={{
+                        padding: "6px 14px",
+                        border: "none",
+                        borderRadius: 6,
+                        background: granularity === g ? "#475569" : "transparent",
+                        color: granularity === g ? COLORS.white : "#94A3B8",
+                        fontWeight: granularity === g ? 700 : 500,
+                        fontSize: 12,
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Product Toggle */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ color: "#94A3B8", fontSize: 12, fontWeight: 600 }}>PRODUCT:</span>
+                <select
+                  value={selectedProduct}
+                  onChange={(e) => setSelectedProduct(e.target.value)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 8,
+                    border: "1px solid #475569",
+                    background: "#1E293B",
+                    color: COLORS.white,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    minWidth: 160,
+                  }}
+                >
+                  {PRODUCTS.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -489,8 +664,8 @@
             {/* ═══════════ OVERVIEW TAB ═══════════ */}
             {activeTab === "Overview" && (
               <>
-                <SectionHeader title="Portal Engagement KPIs" subtitle={`Showing: ${selectedProduct} — Portal Engagement = page-viewing users / total account holders`} />
-                {/* Info banner explaining the metric */}
+                <SectionHeader title="Portal Engagement KPIs" subtitle={`Showing: ${selectedProduct} | Period: ${granularity} | Portal Engagement = page-viewing users / total account holders`} />
+                {/* Info banner */}
                 <div style={{
                   background: "#EFF6FF",
                   border: "1px solid #BFDBFE",
@@ -501,8 +676,9 @@
                   color: "#1E40AF",
                   lineHeight: 1.5,
                 }}>
-                  <strong>Portal Engagement Rate</strong> = unique users who viewed ≥1 page in MyAccount / total account holders.
+                  <strong>Portal Engagement Rate</strong> = unique users (distinct user IDs) who viewed ≥1 page in MyAccount / total account holders.
                   Login-based adoption is ~100% (users must log in to use purchased products), so we measure page-view engagement instead.
+                  All metrics deduplicated at user level per {granularity.toLowerCase()} period.
                 </div>
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
                   <KPITile label="Portal Engagement Rate" value={`${engagementPct}%`} subvalue={`${totalUsers.toLocaleString()} of ${totalAccountHolders.toLocaleString()} acct holders`} trend={4.2} />
@@ -513,9 +689,16 @@
                   <KPITile label="Most Visited Page" value={mostVisitedPage} />
                 </div>
 
+                {/* Three-Tier Engagement Model */}
+                <ThreeTierCard
+                  engagementPct={engagementPct}
+                  pageEngagementTop={`${mostVisitedPage}: ${pageEngTop}`}
+                  multiPagePct={multiPagePct}
+                />
+
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 24 }}>
                   <Card>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Portal Engagement Rate Over Time</h3>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Portal Engagement Rate Over Time ({granularity})</h3>
                     <SimpleLineChart
                       data={trendData}
                       dataKeys={["engagementRate"]}
@@ -526,7 +709,7 @@
                   </Card>
 
                   <Card>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>MyAccount Active Users Over Time</h3>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>MyAccount Active Users Over Time ({granularity})</h3>
                     <SimpleBarChart
                       data={trendData}
                       dataKey="users"
@@ -537,7 +720,7 @@
                   </Card>
                 </div>
 
-                {/* Page Engagement Breakdown — NEW */}
+                {/* Page Engagement Breakdown */}
                 <Card style={{ marginTop: 20 }}>
                   <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 4px" }}>Page Engagement Rate by Page</h3>
                   <p style={{ fontSize: 12, color: COLORS.muted, margin: "0 0 16px" }}>Of MyAccount visitors, what % visit each page? (Critical for monetization placement decisions)</p>
@@ -551,9 +734,11 @@
                     fill={PRODUCT_COLORS[selectedProduct]}
                     layout="vertical"
                     height={260}
+                    unit="%"
                   />
                 </Card>
 
+                {/* Portal Engagement Rate by Product — only when All Products */}
                 {selectedProduct === "All Products" && (
                   <Card style={{ marginTop: 20 }}>
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Portal Engagement Rate by Product</h3>
@@ -564,19 +749,65 @@
                       fill={(d) => PRODUCT_COLORS[d.product]}
                       layout="vertical"
                       height={220}
+                      unit="%"
                     />
                   </Card>
                 )}
+
+                {/* Comparison Table */}
+                <Card style={{ marginTop: 20 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 4px" }}>Monthly Comparison Table</h3>
+                  <p style={{ fontSize: 12, color: COLORS.muted, margin: "0 0 16px" }}>Month, Product, Active Users, Total Account Holders, Portal Engagement Rate %</p>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ borderBottom: `2px solid ${COLORS.border}` }}>
+                          {["Month", "Product", "Active Users", "Total Acct Holders", "Engagement Rate"].map((h) => (
+                            <th key={h} style={{ textAlign: "left", padding: "10px 12px", color: COLORS.muted, fontWeight: 600, fontSize: 11, textTransform: "uppercase" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredComparison.map((r, i) => (
+                          <tr key={i} style={{ borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 1 ? "#F8FAFC" : "transparent" }}>
+                            <td style={{ padding: "10px 12px" }}>{r.month}</td>
+                            <td style={{ padding: "10px 12px", fontWeight: 600 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <div style={{ width: 10, height: 10, borderRadius: 2, background: PRODUCT_COLORS[r.product] || COLORS.muted }} />
+                                {r.product}
+                              </div>
+                            </td>
+                            <td style={{ padding: "10px 12px" }}>{r.activeUsers.toLocaleString()}</td>
+                            <td style={{ padding: "10px 12px" }}>{r.totalHolders.toLocaleString()}</td>
+                            <td style={{ padding: "10px 12px", fontWeight: 700, color: COLORS.accent }}>{r.rate}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
               </>
             )}
 
             {/* ═══════════ PAGE NAVIGATION TAB ═══════════ */}
             {activeTab === "Page Navigation" && (
               <>
-                <SectionHeader title="Page Navigation Metrics" subtitle={`Showing: ${selectedProduct} — How users navigate MyAccount pages`} />
+                <SectionHeader title="Page Navigation Metrics" subtitle={`Showing: ${selectedProduct} | Period: ${granularity} — How users navigate MyAccount pages`} />
+
+                {/* Page Selector Filter */}
+                <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase" }}>Filter Pages:</span>
+                  <PillToggle
+                    options={["All", ...PAGE_NAMES]}
+                    selected={selectedPages}
+                    onChange={setSelectedPages}
+                    multi={true}
+                  />
+                </div>
+
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                  <KPITile label="Total Page Views" value={totalPageViews.toLocaleString()} trend={15.2} />
-                  <KPITile label="Unique Visitors / Page" value={Math.round(totalPageViews * 0.55).toLocaleString()} subvalue="avg across pages" trend={9.4} />
+                  <KPITile label="Total Page Views" value={filteredPageViewData.reduce((s, d) => s + d.views, 0).toLocaleString()} trend={15.2} />
+                  <KPITile label="Unique Visitors / Page" value={Math.round(filteredPageViewData.reduce((s, d) => s + d.uniqueVisitors, 0) / (filteredPageViewData.length || 1)).toLocaleString()} subvalue="avg across pages" trend={9.4} />
                   <KPITile label="Most Visited Page" value={mostVisitedPage} />
                   <KPITile label="Avg Pages / Session" value={avgPagesPerSession} trend={3.1} />
                 </div>
@@ -585,7 +816,7 @@
                   <Card>
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Page Views by Page</h3>
                     <SimpleBarChart
-                      data={sortedPages}
+                      data={[...filteredPageViewData].sort((a, b) => b.views - a.views)}
                       dataKey="views"
                       labelKey="page"
                       fill={PRODUCT_COLORS[selectedProduct]}
@@ -597,7 +828,7 @@
                   <Card>
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Unique Visitors by Page</h3>
                     <SimpleBarChart
-                      data={[...pageViewData].sort((a, b) => b.uniqueVisitors - a.uniqueVisitors)}
+                      data={[...filteredPageViewData].sort((a, b) => b.uniqueVisitors - a.uniqueVisitors)}
                       dataKey="uniqueVisitors"
                       labelKey="page"
                       fill="#27AE60"
@@ -612,7 +843,7 @@
                   <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 4px" }}>Page Engagement Rate by Page</h3>
                   <p style={{ fontSize: 12, color: COLORS.muted, margin: "0 0 16px" }}>Unique visitors to each page / total MyAccount visitors — which pages have traction?</p>
                   <SimpleBarChart
-                    data={pageViewData.map(d => ({
+                    data={filteredPageViewData.map(d => ({
                       page: d.page,
                       rate: +((d.uniqueVisitors / (totalUsers || 1)) * 100).toFixed(1),
                     })).sort((a, b) => b.rate - a.rate)}
@@ -624,19 +855,20 @@
                     }}
                     layout="vertical"
                     height={260}
+                    unit="%"
                   />
                 </Card>
 
                 <Card style={{ marginTop: 20 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Page Views Over Time (by Page)</h3>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Page Views Over Time by Page ({granularity})</h3>
                   <SimpleLineChart
                     data={pageTrendData}
-                    dataKeys={PAGE_NAMES}
-                    colors={PAGE_LINE_COLORS}
+                    dataKeys={filteredPageTrendKeys}
+                    colors={filteredPageTrendColors}
                     labelKey="month"
                     height={300}
                   />
-                  <ChartLegend items={PAGE_NAMES.map((n, i) => ({ label: n, color: PAGE_LINE_COLORS[i] }))} />
+                  <ChartLegend items={filteredPageTrendKeys.map((n, i) => ({ label: n, color: filteredPageTrendColors[i] }))} />
                 </Card>
               </>
             )}
@@ -769,7 +1001,7 @@
 
           {/* Footer */}
           <div style={{ textAlign: "center", padding: "24px 32px", color: COLORS.muted, fontSize: 12, borderTop: `1px solid ${COLORS.border}`, marginTop: 40 }}>
-            MyAccount BI Dashboard V1 Prototype — Data shown is illustrative (mock data) — Portal Engagement = page-viewing users / account holders — Prepared for stakeholder review
+            MyAccount BI Dashboard V1 Prototype — Data shown is illustrative (mock data) — Portal Engagement = distinct page-viewing user IDs / total account holders — Deduplication: user level per period — Prepared for stakeholder review
           </div>
         </div>
       );
