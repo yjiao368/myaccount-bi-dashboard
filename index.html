@@ -4,31 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MyAccount BI Dashboard — V1 Prototype</title>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/recharts@2.10.0/dist/Recharts.js"></script>
 </head>
 <body>
   <div id="root"></div>
 
   <script type="text/babel">
     const { useState, useMemo } = React;
-    const {
-      BarChart,
-      Bar,
-      LineChart,
-      Line,
-      XAxis,
-      YAxis,
-      CartesianGrid,
-      Tooltip,
-      Legend,
-      ResponsiveContainer,
-      PieChart,
-      Pie,
-      Cell,
-    } = window.Recharts;
 
     // ── Color palette ──
     const COLORS = {
@@ -65,42 +49,53 @@
       { key: "security", label: "Security & Privacy", etype: "account-security" },
     ];
 
-    // ── Mock data generators ──
+    // ── Mock data generators (seeded for consistency) ──
+    function seededRandom(seed) {
+      let s = seed;
+      return function() {
+        s = (s * 16807 + 0) % 2147483647;
+        return (s - 1) / 2147483646;
+      };
+    }
+
     const generateTrendData = (product) => {
+      const rng = seededRandom(product.length * 7 + 42);
       const months = ["Sep", "Oct", "Nov", "Dec", "Jan", "Feb"];
       const base = product === "All Products" ? 1 : 0.25;
       return months.map((m, i) => ({
         month: m,
-        adoptionRate: Math.round((12 + i * 3.5) * base + Math.random() * 5),
-        users: Math.round((850 + i * 220) * base + Math.random() * 100),
-        logins: Math.round((1200 + i * 350) * base + Math.random() * 200),
+        adoptionRate: Math.round((12 + i * 3.5) * base + rng() * 5),
+        users: Math.round((850 + i * 220) * base + rng() * 100),
+        logins: Math.round((1200 + i * 350) * base + rng() * 200),
       }));
     };
 
     const generatePageViewData = (product) => {
-      const mult = product === "All Products" ? 1 : 0.3 + Math.random() * 0.2;
+      const rng = seededRandom(product.length * 13 + 99);
+      const mult = product === "All Products" ? 1 : 0.3 + rng() * 0.2;
       return PAGES.map((p) => ({
         page: p.label,
-        views: Math.round((800 + Math.random() * 3200) * mult),
-        uniqueVisitors: Math.round((400 + Math.random() * 1800) * mult),
+        views: Math.round((800 + rng() * 3200) * mult),
+        uniqueVisitors: Math.round((400 + rng() * 1800) * mult),
       }));
     };
 
     const generatePageTrendData = (product) => {
+      const rng = seededRandom(product.length * 5 + 77);
       const months = ["Sep", "Oct", "Nov", "Dec", "Jan", "Feb"];
       const mult = product === "All Products" ? 1 : 0.3;
       return months.map((m, i) => ({
         month: m,
-        Home: Math.round((600 + i * 80 + Math.random() * 150) * mult),
-        "Manage Products": Math.round((400 + i * 65 + Math.random() * 100) * mult),
-        Subscriptions: Math.round((350 + i * 55 + Math.random() * 90) * mult),
-        "Payment Info": Math.round((200 + i * 30 + Math.random() * 60) * mult),
-        "Manage Account": Math.round((180 + i * 25 + Math.random() * 50) * mult),
-        "Security & Privacy": Math.round((120 + i * 20 + Math.random() * 40) * mult),
+        Home: Math.round((600 + i * 80 + rng() * 150) * mult),
+        "Manage Products": Math.round((400 + i * 65 + rng() * 100) * mult),
+        Subscriptions: Math.round((350 + i * 55 + rng() * 90) * mult),
+        "Payment Info": Math.round((200 + i * 30 + rng() * 60) * mult),
+        "Manage Account": Math.round((180 + i * 25 + rng() * 50) * mult),
+        "Security & Privacy": Math.round((120 + i * 20 + rng() * 40) * mult),
       }));
     };
 
-    const generateReferrerData = () => [
+    const referrerData = [
       { product: "Adaware", sessions: 2840, home: 1200, products: 680, subscriptions: 520, billing: 240, account: 120, security: 80 },
       { product: "GameBuff", sessions: 1920, home: 900, products: 420, subscriptions: 310, billing: 150, account: 90, security: 50 },
       { product: "InPixio", sessions: 1560, home: 720, products: 380, subscriptions: 250, billing: 110, account: 60, security: 40 },
@@ -109,7 +104,7 @@
       { product: "PDF Suite", sessions: 320, home: 140, products: 80, subscriptions: 55, billing: 25, account: 12, security: 8 },
     ];
 
-    const generateAttributionTable = () => [
+    const attrTable = [
       { userId: "usr_28401", products: "Adaware, Soda PDF", referrer: "Adaware", pages: "Home, Products, Subscriptions", date: "2026-02-24" },
       { userId: "usr_15903", products: "GameBuff", referrer: "GameBuff", pages: "Home, Security & Privacy", date: "2026-02-24" },
       { userId: "usr_09821", products: "InPixio, CleanBuff, Soda PDF", referrer: "Soda PDF", pages: "Home, Payment Info", date: "2026-02-23" },
@@ -126,7 +121,191 @@
       { name: "3+ Products", value: 580, color: "#1B3A5C" },
     ];
 
-    // ── Components ──
+    // ═══════════════════════════════════════════════
+    // PURE SVG CHART COMPONENTS (no external library)
+    // ═══════════════════════════════════════════════
+
+    function SimpleBarChart({ data, dataKey, labelKey, fill, width = "100%", height = 260, layout = "vertical" }) {
+      const maxVal = Math.max(...data.map(d => d[dataKey]));
+      const padding = { top: 20, right: 40, bottom: 30, left: layout === "vertical" ? 120 : 40 };
+      const svgH = height;
+      const svgW = 560;
+      const chartW = svgW - padding.left - padding.right;
+      const chartH = svgH - padding.top - padding.bottom;
+
+      if (layout === "vertical") {
+        const barH = Math.min(28, (chartH - data.length * 4) / data.length);
+        const totalBarsH = data.length * (barH + 4);
+        return (
+          <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: "100%", height: height }}>
+            {data.map((d, i) => {
+              const y = padding.top + i * (barH + 4);
+              const w = maxVal > 0 ? (d[dataKey] / maxVal) * chartW : 0;
+              return (
+                <g key={i}>
+                  <text x={padding.left - 8} y={y + barH / 2 + 4} textAnchor="end" fontSize="11" fill={COLORS.text}>{d[labelKey]}</text>
+                  <rect x={padding.left} y={y} width={w} height={barH} rx="4" fill={typeof fill === "function" ? fill(d, i) : fill} />
+                  <text x={padding.left + w + 6} y={y + barH / 2 + 4} fontSize="11" fill={COLORS.muted}>{d[dataKey].toLocaleString()}</text>
+                </g>
+              );
+            })}
+          </svg>
+        );
+      }
+
+      // Normal (vertical bars) layout
+      const barW = Math.min(40, (chartW - data.length * 6) / data.length);
+      const gap = (chartW - data.length * barW) / (data.length + 1);
+      return (
+        <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: "100%", height: height }}>
+          {/* Grid lines */}
+          {[0, 0.25, 0.5, 0.75, 1].map((frac, i) => (
+            <g key={i}>
+              <line x1={padding.left} x2={svgW - padding.right} y1={padding.top + chartH * (1 - frac)} y2={padding.top + chartH * (1 - frac)} stroke="#E2E8F0" strokeDasharray="3 3" />
+              <text x={padding.left - 6} y={padding.top + chartH * (1 - frac) + 4} textAnchor="end" fontSize="10" fill={COLORS.muted}>{Math.round(maxVal * frac).toLocaleString()}</text>
+            </g>
+          ))}
+          {data.map((d, i) => {
+            const x = padding.left + gap + i * (barW + gap);
+            const h = maxVal > 0 ? (d[dataKey] / maxVal) * chartH : 0;
+            const y = padding.top + chartH - h;
+            return (
+              <g key={i}>
+                <rect x={x} y={y} width={barW} height={h} rx="4" fill={typeof fill === "function" ? fill(d, i) : fill} />
+                <text x={x + barW / 2} y={svgH - 8} textAnchor="middle" fontSize="10" fill={COLORS.text}>{d[labelKey]}</text>
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+
+    function SimpleLineChart({ data, dataKeys, colors, labelKey, width = "100%", height = 260, unit = "" }) {
+      const allVals = dataKeys.flatMap(k => data.map(d => d[k]));
+      const maxVal = Math.max(...allVals);
+      const minVal = Math.min(0, Math.min(...allVals));
+      const range = maxVal - minVal || 1;
+      const padding = { top: 20, right: 20, bottom: 35, left: 50 };
+      const svgW = 560;
+      const svgH = height;
+      const chartW = svgW - padding.left - padding.right;
+      const chartH = svgH - padding.top - padding.bottom;
+
+      const getX = (i) => padding.left + (i / (data.length - 1)) * chartW;
+      const getY = (val) => padding.top + chartH - ((val - minVal) / range) * chartH;
+
+      return (
+        <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: "100%", height: height }}>
+          {/* Grid lines */}
+          {[0, 0.25, 0.5, 0.75, 1].map((frac, i) => {
+            const val = minVal + range * frac;
+            return (
+              <g key={i}>
+                <line x1={padding.left} x2={svgW - padding.right} y1={getY(val)} y2={getY(val)} stroke="#E2E8F0" strokeDasharray="3 3" />
+                <text x={padding.left - 6} y={getY(val) + 4} textAnchor="end" fontSize="10" fill={COLORS.muted}>{Math.round(val)}{unit}</text>
+              </g>
+            );
+          })}
+          {/* X labels */}
+          {data.map((d, i) => (
+            <text key={i} x={getX(i)} y={svgH - 8} textAnchor="middle" fontSize="10" fill={COLORS.text}>{d[labelKey]}</text>
+          ))}
+          {/* Lines */}
+          {dataKeys.map((key, ki) => {
+            const points = data.map((d, i) => `${getX(i)},${getY(d[key])}`).join(" ");
+            return (
+              <g key={ki}>
+                <polyline points={points} fill="none" stroke={colors[ki]} strokeWidth="2.5" strokeLinejoin="round" />
+                {data.map((d, i) => (
+                  <circle key={i} cx={getX(i)} cy={getY(d[key])} r="3.5" fill={colors[ki]} stroke={COLORS.white} strokeWidth="1.5" />
+                ))}
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+
+    function SimplePieChart({ data, size = 180 }) {
+      const total = data.reduce((s, d) => s + d.value, 0);
+      const cx = size / 2, cy = size / 2, r = size * 0.38, ir = size * 0.24;
+      let cumAngle = -Math.PI / 2;
+      const slices = data.map(d => {
+        const angle = (d.value / total) * 2 * Math.PI;
+        const startAngle = cumAngle;
+        cumAngle += angle;
+        const endAngle = cumAngle;
+        const x1o = cx + r * Math.cos(startAngle), y1o = cy + r * Math.sin(startAngle);
+        const x2o = cx + r * Math.cos(endAngle), y2o = cy + r * Math.sin(endAngle);
+        const x1i = cx + ir * Math.cos(endAngle), y1i = cy + ir * Math.sin(endAngle);
+        const x2i = cx + ir * Math.cos(startAngle), y2i = cy + ir * Math.sin(startAngle);
+        const large = angle > Math.PI ? 1 : 0;
+        const path = `M${x1o},${y1o} A${r},${r} 0 ${large} 1 ${x2o},${y2o} L${x1i},${y1i} A${ir},${ir} 0 ${large} 0 ${x2i},${y2i} Z`;
+        return { ...d, path, pct: ((d.value / total) * 100).toFixed(1) };
+      });
+      return (
+        <svg viewBox={`0 0 ${size} ${size}`} style={{ width: size, height: size }}>
+          {slices.map((s, i) => (
+            <path key={i} d={s.path} fill={s.color} stroke={COLORS.white} strokeWidth="2" />
+          ))}
+          <text x={cx} y={cy - 6} textAnchor="middle" fontSize="18" fontWeight="700" fill={COLORS.primary}>{total.toLocaleString()}</text>
+          <text x={cx} y={cy + 10} textAnchor="middle" fontSize="9" fill={COLORS.muted}>total users</text>
+        </svg>
+      );
+    }
+
+    function SimpleStackedBarChart({ data, stackKeys, stackColors, labelKey, height = 300 }) {
+      const maxVal = Math.max(...data.map(d => stackKeys.reduce((s, k) => s + (d[k] || 0), 0)));
+      const padding = { top: 20, right: 20, bottom: 35, left: 50 };
+      const svgW = 560;
+      const svgH = height;
+      const chartW = svgW - padding.left - padding.right;
+      const chartH = svgH - padding.top - padding.bottom;
+      const barW = Math.min(50, (chartW - data.length * 8) / data.length);
+      const gap = (chartW - data.length * barW) / (data.length + 1);
+
+      return (
+        <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: "100%", height: height }}>
+          {[0, 0.25, 0.5, 0.75, 1].map((frac, i) => (
+            <g key={i}>
+              <line x1={padding.left} x2={svgW - padding.right} y1={padding.top + chartH * (1 - frac)} y2={padding.top + chartH * (1 - frac)} stroke="#E2E8F0" strokeDasharray="3 3" />
+              <text x={padding.left - 6} y={padding.top + chartH * (1 - frac) + 4} textAnchor="end" fontSize="10" fill={COLORS.muted}>{Math.round(maxVal * frac).toLocaleString()}</text>
+            </g>
+          ))}
+          {data.map((d, i) => {
+            const x = padding.left + gap + i * (barW + gap);
+            let cumH = 0;
+            return (
+              <g key={i}>
+                {stackKeys.map((k, ki) => {
+                  const val = d[k] || 0;
+                  const h = maxVal > 0 ? (val / maxVal) * chartH : 0;
+                  const y = padding.top + chartH - cumH - h;
+                  cumH += h;
+                  return <rect key={ki} x={x} y={y} width={barW} height={h} fill={stackColors[ki]} rx={ki === stackKeys.length - 1 ? "4" : "0"} />;
+                })}
+                <text x={x + barW / 2} y={svgH - 8} textAnchor="middle" fontSize="9" fill={COLORS.text}>{d[labelKey]}</text>
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+
+    function ChartLegend({ items }) {
+      return (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center", marginTop: 8 }}>
+          {items.map((item, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: COLORS.text }}>
+              <div style={{ width: 10, height: 10, borderRadius: 2, background: item.color, flexShrink: 0 }} />
+              {item.label}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // ── UI Components ──
     function KPITile({ label, value, subvalue, trend, color = COLORS.accent }) {
       const isUp = trend >= 0;
       return (
@@ -217,19 +396,33 @@
       const trendData = useMemo(() => generateTrendData(selectedProduct), [selectedProduct]);
       const pageViewData = useMemo(() => generatePageViewData(selectedProduct), [selectedProduct]);
       const pageTrendData = useMemo(() => generatePageTrendData(selectedProduct), [selectedProduct]);
-      const referrerData = useMemo(() => generateReferrerData(), []);
-      const attrTable = useMemo(() => generateAttributionTable(), []);
 
-      const mult = selectedProduct === "All Products" ? 1 : 0.22 + Math.random() * 0.1;
+      const rng = seededRandom(selectedProduct.length * 3 + 11);
+      const mult = selectedProduct === "All Products" ? 1 : 0.22 + rng() * 0.1;
       const totalUsers = Math.round(7040 * mult);
       const newAccounts = Math.round(1280 * mult);
       const logins = Math.round(12400 * mult);
-      const adoptionPct = selectedProduct === "All Products" ? 28.4 : (15 + Math.random() * 20).toFixed(1);
-      const loginRate = selectedProduct === "All Products" ? 72.1 : (55 + Math.random() * 25).toFixed(1);
-      const loginsPerUser = selectedProduct === "All Products" ? 1.76 : (1.2 + Math.random() * 0.8).toFixed(2);
+      const adoptionPct = selectedProduct === "All Products" ? 28.4 : (15 + rng() * 20).toFixed(1);
+      const loginRate = selectedProduct === "All Products" ? 72.1 : (55 + rng() * 25).toFixed(1);
+      const loginsPerUser = selectedProduct === "All Products" ? 1.76 : (1.2 + rng() * 0.8).toFixed(2);
       const totalPageViews = pageViewData.reduce((s, d) => s + d.views, 0);
       const avgPagesPerSession = (totalPageViews / (logins || 1)).toFixed(1);
-      const mostVisitedPage = pageViewData.sort((a, b) => b.views - a.views)[0]?.page || "Home";
+      const sortedPages = [...pageViewData].sort((a, b) => b.views - a.views);
+      const mostVisitedPage = sortedPages[0]?.page || "Home";
+
+      const productAdoptionData = useMemo(() => {
+        const rng2 = seededRandom(101);
+        return PRODUCTS.filter(p => p !== "All Products").map(p => ({
+          product: p,
+          rate: +(15 + rng2() * 25).toFixed(1),
+        }));
+      }, []);
+
+      const PAGE_LINE_COLORS = ["#1B3A5C", "#2E75B6", "#27AE60", "#F39C12", "#9B59B6", "#E74C3C"];
+      const PAGE_NAMES = ["Home", "Manage Products", "Subscriptions", "Payment Info", "Manage Account", "Security & Privacy"];
+      const STACK_KEYS = ["home", "products", "subscriptions", "billing", "account", "security"];
+      const STACK_COLORS = ["#1B3A5C", "#2E75B6", "#27AE60", "#F39C12", "#9B59B6", "#E74C3C"];
+      const STACK_LABELS = ["Home", "Products", "Subscriptions", "Billing", "Account", "Security"];
 
       return (
         <div style={{ background: "#F1F5F9", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
@@ -291,7 +484,7 @@
           {/* Content */}
           <div style={{ padding: "24px 32px", maxWidth: 1280, margin: "0 auto" }}>
 
-            {/* ═══════════ OVERVIEW TAB (V1) ═══════════ */}
+            {/* ═══════════ OVERVIEW TAB ═══════════ */}
             {activeTab === "Overview" && (
               <>
                 <SectionHeader title="Adoption & Engagement KPIs" subtitle={`Showing: ${selectedProduct}`} />
@@ -307,56 +500,44 @@
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 24 }}>
                   <Card>
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Adoption Rate Over Time</h3>
-                    <ResponsiveContainer width="100%" height={260}>
-                      <LineChart data={trendData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                        <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} unit="%" />
-                        <Tooltip />
-                        <Line type="monotone" dataKey="adoptionRate" stroke={PRODUCT_COLORS[selectedProduct]} strokeWidth={2.5} dot={{ r: 4 }} name="Adoption Rate %" />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    <SimpleLineChart
+                      data={trendData}
+                      dataKeys={["adoptionRate"]}
+                      colors={[PRODUCT_COLORS[selectedProduct]]}
+                      labelKey="month"
+                      unit="%"
+                    />
                   </Card>
 
                   <Card>
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>MyAccount Users Over Time</h3>
-                    <ResponsiveContainer width="100%" height={260}>
-                      <BarChart data={trendData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                        <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip />
-                        <Bar dataKey="users" fill={PRODUCT_COLORS[selectedProduct]} radius={[4, 4, 0, 0]} name="Users" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <SimpleBarChart
+                      data={trendData}
+                      dataKey="users"
+                      labelKey="month"
+                      fill={PRODUCT_COLORS[selectedProduct]}
+                      layout="normal"
+                    />
                   </Card>
                 </div>
 
                 {selectedProduct === "All Products" && (
                   <Card style={{ marginTop: 20 }}>
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Adoption Rate by Product</h3>
-                    <ResponsiveContainer width="100%" height={260}>
-                      <BarChart data={PRODUCTS.filter(p => p !== "All Products").map(p => ({
-                        product: p,
-                        rate: +(15 + Math.random() * 25).toFixed(1),
-                      }))} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                        <XAxis type="number" unit="%" tick={{ fontSize: 12 }} />
-                        <YAxis type="category" dataKey="product" tick={{ fontSize: 12 }} width={90} />
-                        <Tooltip />
-                        <Bar dataKey="rate" radius={[0, 4, 4, 0]} name="Adoption Rate %">
-                          {PRODUCTS.filter(p => p !== "All Products").map((p, i) => (
-                            <Cell key={i} fill={PRODUCT_COLORS[p]} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <SimpleBarChart
+                      data={productAdoptionData}
+                      dataKey="rate"
+                      labelKey="product"
+                      fill={(d) => PRODUCT_COLORS[d.product]}
+                      layout="vertical"
+                      height={220}
+                    />
                   </Card>
                 )}
               </>
             )}
 
-            {/* ═══════════ PAGE NAVIGATION TAB (V2 NEW) ═══════════ */}
+            {/* ═══════════ PAGE NAVIGATION TAB ═══════════ */}
             {activeTab === "Page Navigation" && (
               <>
                 <SectionHeader title="Page Navigation Metrics" subtitle={`Showing: ${selectedProduct} — How users navigate MyAccount pages`} />
@@ -370,53 +551,44 @@
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 24 }}>
                   <Card>
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Page Views by Page</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={pageViewData} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                        <XAxis type="number" tick={{ fontSize: 12 }} />
-                        <YAxis type="category" dataKey="page" tick={{ fontSize: 11 }} width={120} />
-                        <Tooltip />
-                        <Bar dataKey="views" fill={PRODUCT_COLORS[selectedProduct]} radius={[0, 4, 4, 0]} name="Page Views" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <SimpleBarChart
+                      data={sortedPages}
+                      dataKey="views"
+                      labelKey="page"
+                      fill={PRODUCT_COLORS[selectedProduct]}
+                      layout="vertical"
+                      height={280}
+                    />
                   </Card>
 
                   <Card>
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Unique Visitors by Page</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={pageViewData} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                        <XAxis type="number" tick={{ fontSize: 12 }} />
-                        <YAxis type="category" dataKey="page" tick={{ fontSize: 11 }} width={120} />
-                        <Tooltip />
-                        <Bar dataKey="uniqueVisitors" fill="#27AE60" radius={[0, 4, 4, 0]} name="Unique Visitors" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <SimpleBarChart
+                      data={[...pageViewData].sort((a, b) => b.uniqueVisitors - a.uniqueVisitors)}
+                      dataKey="uniqueVisitors"
+                      labelKey="page"
+                      fill="#27AE60"
+                      layout="vertical"
+                      height={280}
+                    />
                   </Card>
                 </div>
 
                 <Card style={{ marginTop: 20 }}>
                   <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Page Views Over Time (by Page)</h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={pageTrendData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                      <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip />
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
-                      <Line type="monotone" dataKey="Home" stroke="#1B3A5C" strokeWidth={2} dot={{ r: 3 }} />
-                      <Line type="monotone" dataKey="Manage Products" stroke="#2E75B6" strokeWidth={2} dot={{ r: 3 }} />
-                      <Line type="monotone" dataKey="Subscriptions" stroke="#27AE60" strokeWidth={2} dot={{ r: 3 }} />
-                      <Line type="monotone" dataKey="Payment Info" stroke="#F39C12" strokeWidth={2} dot={{ r: 3 }} />
-                      <Line type="monotone" dataKey="Manage Account" stroke="#9B59B6" strokeWidth={2} dot={{ r: 3 }} />
-                      <Line type="monotone" dataKey="Security & Privacy" stroke="#E74C3C" strokeWidth={2} dot={{ r: 3 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <SimpleLineChart
+                    data={pageTrendData}
+                    dataKeys={PAGE_NAMES}
+                    colors={PAGE_LINE_COLORS}
+                    labelKey="month"
+                    height={300}
+                  />
+                  <ChartLegend items={PAGE_NAMES.map((n, i) => ({ label: n, color: PAGE_LINE_COLORS[i] }))} />
                 </Card>
               </>
             )}
 
-            {/* ═══════════ USER ATTRIBUTION TAB (V2 NEW) ═══════════ */}
+            {/* ═══════════ USER ATTRIBUTION TAB ═══════════ */}
             {activeTab === "User Attribution" && (
               <>
                 <SectionHeader title="User-Product Attribution" subtitle="Which products do MyAccount visitors own, and which product sent them here?" />
@@ -430,43 +602,22 @@
                 <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20, marginTop: 24 }}>
                   <Card>
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Sessions by Referrer Product</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={referrerData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                        <XAxis dataKey="product" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Bar dataKey="home" stackId="a" fill="#1B3A5C" name="Home" />
-                        <Bar dataKey="products" stackId="a" fill="#2E75B6" name="Products" />
-                        <Bar dataKey="subscriptions" stackId="a" fill="#27AE60" name="Subscriptions" />
-                        <Bar dataKey="billing" stackId="a" fill="#F39C12" name="Billing" />
-                        <Bar dataKey="account" stackId="a" fill="#9B59B6" name="Account" />
-                        <Bar dataKey="security" stackId="a" fill="#E74C3C" name="Security" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <SimpleStackedBarChart
+                      data={referrerData}
+                      stackKeys={STACK_KEYS}
+                      stackColors={STACK_COLORS}
+                      labelKey="product"
+                      height={300}
+                    />
+                    <ChartLegend items={STACK_LABELS.map((l, i) => ({ label: l, color: STACK_COLORS[i] }))} />
                   </Card>
 
                   <Card>
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Product Ownership Mix</h3>
-                    <ResponsiveContainer width="100%" height={240}>
-                      <PieChart>
-                        <Pie data={multiProductData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" paddingAngle={3}>
-                          {multiProductData.map((entry, i) => (
-                            <Cell key={i} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 4 }}>
-                      {multiProductData.map((d, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: COLORS.text }}>
-                          <div style={{ width: 10, height: 10, borderRadius: 2, background: d.color }} />
-                          {d.name}
-                        </div>
-                      ))}
+                    <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+                      <SimplePieChart data={multiProductData} />
                     </div>
+                    <ChartLegend items={multiProductData.map(d => ({ label: `${d.name} (${d.value.toLocaleString()})`, color: d.color }))} />
                   </Card>
                 </div>
 
