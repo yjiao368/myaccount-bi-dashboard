@@ -1,376 +1,1015 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MyAccount BI Dashboard — V2 Prototype</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-    .tab-active { background: white; color: #2563eb; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-    .tab-inactive { color: #4b5563; }
-    .tab-inactive:hover { color: #111827; }
-    canvas { max-height: 280px; }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MyAccount BI Dashboard — V1 Prototype</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-gray-50">
-  <div class="min-h-screen p-6">
-    <div class="max-w-7xl mx-auto">
-      <!-- Header -->
-      <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">MyAccount BI Dashboard</h1>
-        <p class="text-sm text-gray-500">V2 Prototype — Feb 2026</p>
-      </div>
+<body>
+  <div id="root"></div>
 
-      <!-- Tabs -->
-      <div class="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit" id="tabs">
-        <button onclick="switchTab('overview')" data-tab="overview" class="px-4 py-2 rounded-md text-sm font-medium transition-colors tab-active">Overview</button>
-        <button onclick="switchTab('pages')" data-tab="pages" class="px-4 py-2 rounded-md text-sm font-medium transition-colors tab-inactive">Page Navigation</button>
-        <button onclick="switchTab('attribution')" data-tab="attribution" class="px-4 py-2 rounded-md text-sm font-medium transition-colors tab-inactive">User Attribution</button>
-        <button onclick="switchTab('conversions')" data-tab="conversions" class="px-4 py-2 rounded-md text-sm font-medium transition-colors tab-inactive flex items-center gap-2">Conversions <span class="bg-amber-400 text-amber-900 text-xs px-1.5 py-0.5 rounded font-semibold">NEW</span></button>
-      </div>
+  <script type="text/babel">
+    const { useState, useMemo } = React;
 
-      <!-- Filters -->
-      <div class="flex gap-4 mb-6">
-        <select id="productFilter" onchange="updateDashboard()" class="px-3 py-2 border rounded-lg bg-white text-sm">
-          <option>All Products</option>
-          <option>Adaware</option>
-          <option>GameBuff</option>
-          <option>InPixio</option>
-          <option>CleanBuff</option>
-        </select>
-        <select id="periodFilter" class="px-3 py-2 border rounded-lg bg-white text-sm">
-          <option>Monthly</option>
-          <option>Weekly</option>
-          <option>Daily</option>
-        </select>
-      </div>
-
-      <!-- Tab Content -->
-      <div id="tab-overview"></div>
-      <div id="tab-pages" class="hidden"></div>
-      <div id="tab-attribution" class="hidden"></div>
-      <div id="tab-conversions" class="hidden"></div>
-    </div>
-  </div>
-
-  <script>
-    // ── Data ──
-    const kpiData = {
-      'All Products': { engagement: 14.0, activeUsers: 3480, newAccounts: 165, multiPage: 42.3, loginsPerUser: 1.8, totalHolders: 24857 },
-      'Adaware': { engagement: 12.8, activeUsers: 1240, newAccounts: 52, multiPage: 38.5, loginsPerUser: 1.6, totalHolders: 9688 },
-      'GameBuff': { engagement: 18.2, activeUsers: 980, newAccounts: 48, multiPage: 51.2, loginsPerUser: 2.1, totalHolders: 5385 },
-      'InPixio': { engagement: 11.5, activeUsers: 720, newAccounts: 38, multiPage: 35.8, loginsPerUser: 1.5, totalHolders: 6261 },
-      'CleanBuff': { engagement: 15.3, activeUsers: 540, newAccounts: 27, multiPage: 44.1, loginsPerUser: 1.9, totalHolders: 3523 }
+    // ── Color palette ──
+    const COLORS = {
+      primary: "#1B3A5C",
+      accent: "#2E75B6",
+      success: "#27AE60",
+      warning: "#F39C12",
+      danger: "#E74C3C",
+      light: "#F8F9FA",
+      border: "#E2E8F0",
+      text: "#334155",
+      muted: "#94A3B8",
+      white: "#FFFFFF",
     };
-    const pageLabels = ['Home','Manage Products','Subscriptions','Payment Info','Manage Account','Security'];
-    const pageViews = [4820, 2890, 2410, 1650, 1240, 680];
-    const pageVisitors = [2610, 1740, 1392, 1044, 870, 522];
-    const pageEngagement = [75, 50, 40, 30, 25, 15];
-    const trendMonths = ['Sep','Oct','Nov','Dec','Jan','Feb'];
-    const trendEngagement = [11.2, 12.1, 12.8, 13.2, 13.8, 14.0];
-    const attrProducts = ['Adaware','GameBuff','InPixio','CleanBuff'];
-    const attrSessions = [1580, 1240, 920, 680];
-    const attrMulti = [185, 210, 95, 72];
-    const attrTopPage = ['Subscriptions','Manage Products','Home','Payment Info'];
-    const convPages = ['Subscriptions','Manage Products','Payment Info','Home'];
-    const convRates = [2.8, 1.9, 1.4, 0.6];
-    const funnelLabels = ['Page Visits','CTA Impressions','CTA Clicks','Purchases'];
-    const funnelValues = [3480, 1856, 312, 42];
-    const funnelColors = ['#3b82f6','#60a5fa','#93c5fd','#22c55e'];
-    const srcLabels = ['Email Campaign','Desktop Notif','Web App','Organic'];
-    const srcConversions = [22, 11, 6, 3];
-    const srcData = [
-      { source:'Email Campaign', sessions:1420, clicks:142, conversions:22, rate:'15.5%', revenue:'$892' },
-      { source:'Desktop Notif', sessions:980, clicks:88, conversions:11, rate:'12.5%', revenue:'$445' },
-      { source:'Web App', sessions:720, clicks:58, conversions:6, rate:'10.3%', revenue:'$398' },
-      { source:'Organic', sessions:360, clicks:24, conversions:3, rate:'12.5%', revenue:'$230' }
-    ];
-    const revData = [
-      { name:'Adaware', total:'$685', upsell:'$420', cross:'$265', value:685 },
-      { name:'GameBuff', total:'$520', upsell:'$285', cross:'$235', value:520 },
-      { name:'InPixio', total:'$445', upsell:'$310', cross:'$135', value:445 },
-      { name:'CleanBuff', total:'$315', upsell:'$195', cross:'$120', value:315 }
-    ];
-    const COLORS = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6'];
 
-    // ── Helpers ──
-    const charts = {};
-    function kpiCard(title, value, subtitle, trend) {
-      let trendHtml = '';
-      if (trend) {
-        const col = trend > 0 ? 'text-green-600' : 'text-red-600';
-        const arrow = trend > 0
-          ? '<svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>'
-          : '<svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0v-8m0 8l-8-8-4 4-6-6"/></svg>';
-        trendHtml = `<div class="flex items-center text-xs mt-1 ${col}">${arrow}${Math.abs(trend)}% vs last month</div>`;
+    const PRODUCT_COLORS = {
+      "All Products": "#2E75B6",
+      Adaware: "#E74C3C",
+      GameBuff: "#9B59B6",
+      InPixio: "#2ECC71",
+      CleanBuff: "#3498DB",
+      "PDF Suite": "#F39C12",
+      "Soda PDF": "#E67E22",
+    };
+
+    const PRODUCTS = ["All Products", "Adaware", "GameBuff", "InPixio", "CleanBuff", "PDF Suite", "Soda PDF"];
+
+    const PAGES = [
+      { key: "home", label: "Home", etype: "account-home" },
+      { key: "products", label: "Manage Products", etype: "account-product" },
+      { key: "subscriptions", label: "Subscriptions", etype: "account-subscription" },
+      { key: "billing", label: "Payment Info", etype: "account-billing" },
+      { key: "account", label: "Manage Account", etype: "account-home" },
+      { key: "security", label: "Security & Privacy", etype: "account-security" },
+    ];
+
+    const GRANULARITY_OPTIONS = ["Monthly", "Weekly", "Daily"];
+
+    // ── Mock data generators (seeded for consistency) ──
+    function seededRandom(seed) {
+      let s = seed;
+      return function() {
+        s = (s * 16807 + 0) % 2147483647;
+        return (s - 1) / 2147483646;
+      };
+    }
+
+    const generateTrendData = (product, granularity) => {
+      const rng = seededRandom(product.length * 7 + 42 + granularity.length);
+      const base = product === "All Products" ? 1 : 0.25;
+      let labels;
+      if (granularity === "Daily") {
+        labels = ["Feb 20", "Feb 21", "Feb 22", "Feb 23", "Feb 24", "Feb 25", "Feb 26"];
+      } else if (granularity === "Weekly") {
+        labels = ["W1 Jan", "W2 Jan", "W3 Jan", "W4 Jan", "W1 Feb", "W2 Feb", "W3 Feb", "W4 Feb"];
+      } else {
+        labels = ["Sep", "Oct", "Nov", "Dec", "Jan", "Feb"];
       }
-      return `<div class="bg-white rounded-lg p-4 shadow-sm border">
-        <div class="text-sm text-gray-500 mb-2">${title}</div>
-        <div class="text-2xl font-bold text-gray-900">${value}</div>
-        ${subtitle ? `<div class="text-xs text-gray-500 mt-1">${subtitle}</div>` : ''}
-        ${trendHtml}
-      </div>`;
-    }
+      return labels.map((m, i) => ({
+        month: m,
+        engagementRate: Math.round((12 + i * 3.5) * base + rng() * 5),
+        users: Math.round((850 + i * 220) * base + rng() * 100),
+        logins: Math.round((1200 + i * 350) * base + rng() * 200),
+      }));
+    };
 
-    function makeChart(id, cfg) {
-      if (charts[id]) charts[id].destroy();
-      const ctx = document.getElementById(id);
-      if (!ctx) return;
-      charts[id] = new Chart(ctx, cfg);
-    }
+    const generatePageViewData = (product) => {
+      const rng = seededRandom(product.length * 13 + 99);
+      const mult = product === "All Products" ? 1 : 0.3 + rng() * 0.2;
+      return PAGES.map((p) => ({
+        page: p.label,
+        views: Math.round((800 + rng() * 3200) * mult),
+        uniqueVisitors: Math.round((400 + rng() * 1800) * mult),
+      }));
+    };
 
-    // ── Tab switching ──
-    let currentTab = 'overview';
-    function switchTab(tab) {
-      document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
-      document.getElementById('tab-' + tab).classList.remove('hidden');
-      document.querySelectorAll('#tabs button').forEach(btn => {
-        btn.classList.remove('tab-active');
-        btn.classList.add('tab-inactive');
+    const generatePageTrendData = (product, granularity) => {
+      const rng = seededRandom(product.length * 5 + 77 + granularity.length);
+      const mult = product === "All Products" ? 1 : 0.3;
+      let labels;
+      if (granularity === "Daily") {
+        labels = ["Feb 20", "Feb 21", "Feb 22", "Feb 23", "Feb 24", "Feb 25", "Feb 26"];
+      } else if (granularity === "Weekly") {
+        labels = ["W1 Jan", "W2 Jan", "W3 Jan", "W4 Jan", "W1 Feb", "W2 Feb", "W3 Feb", "W4 Feb"];
+      } else {
+        labels = ["Sep", "Oct", "Nov", "Dec", "Jan", "Feb"];
+      }
+      return labels.map((m, i) => ({
+        month: m,
+        Home: Math.round((600 + i * 80 + rng() * 150) * mult),
+        "Manage Products": Math.round((400 + i * 65 + rng() * 100) * mult),
+        Subscriptions: Math.round((350 + i * 55 + rng() * 90) * mult),
+        "Payment Info": Math.round((200 + i * 30 + rng() * 60) * mult),
+        "Manage Account": Math.round((180 + i * 25 + rng() * 50) * mult),
+        "Security & Privacy": Math.round((120 + i * 20 + rng() * 40) * mult),
+      }));
+    };
+
+    const referrerData = [
+      { product: "Adaware", sessions: 2840, home: 1200, products: 680, subscriptions: 520, billing: 240, account: 120, security: 80 },
+      { product: "GameBuff", sessions: 1920, home: 900, products: 420, subscriptions: 310, billing: 150, account: 90, security: 50 },
+      { product: "InPixio", sessions: 1560, home: 720, products: 380, subscriptions: 250, billing: 110, account: 60, security: 40 },
+      { product: "CleanBuff", sessions: 980, home: 450, products: 240, subscriptions: 160, billing: 70, account: 40, security: 20 },
+      { product: "Soda PDF", sessions: 640, home: 280, products: 160, subscriptions: 110, billing: 50, account: 25, security: 15 },
+      { product: "PDF Suite", sessions: 320, home: 140, products: 80, subscriptions: 55, billing: 25, account: 12, security: 8 },
+    ];
+
+    const attrTable = [
+      { userId: "usr_28401", products: "Adaware, Soda PDF", referrer: "Adaware", pages: "Home, Products, Subscriptions", date: "2026-02-24" },
+      { userId: "usr_15903", products: "GameBuff", referrer: "GameBuff", pages: "Home, Security & Privacy", date: "2026-02-24" },
+      { userId: "usr_09821", products: "InPixio, CleanBuff, Soda PDF", referrer: "Soda PDF", pages: "Home, Payment Info", date: "2026-02-23" },
+      { userId: "usr_44210", products: "Adaware", referrer: "Adaware", pages: "Home, Products", date: "2026-02-23" },
+      { userId: "usr_33107", products: "GameBuff, Adaware", referrer: "GameBuff", pages: "Home, Products, Account", date: "2026-02-22" },
+      { userId: "usr_77562", products: "CleanBuff", referrer: "CleanBuff", pages: "Home, Subscriptions, Billing", date: "2026-02-22" },
+      { userId: "usr_61045", products: "Soda PDF", referrer: "Soda PDF", pages: "Home, Products, Subscriptions", date: "2026-02-21" },
+      { userId: "usr_88293", products: "InPixio, PDF Suite", referrer: "InPixio", pages: "Home, Account, Security", date: "2026-02-21" },
+    ];
+
+    const multiProductData = [
+      { name: "Single Product", value: 4820, color: "#94A3B8" },
+      { name: "2 Products", value: 1640, color: "#2E75B6" },
+      { name: "3+ Products", value: 580, color: "#1B3A5C" },
+    ];
+
+    // Generate comparison table data (Monthly: Month × Product)
+    const generateComparisonData = () => {
+      const months = ["Oct 2025", "Nov 2025", "Dec 2025", "Jan 2026", "Feb 2026"];
+      const products = PRODUCTS.filter(p => p !== "All Products");
+      const rows = [];
+      const rng = seededRandom(555);
+      products.forEach(prod => {
+        months.forEach((month, mi) => {
+          const totalHolders = Math.round((2000 + rng() * 4000));
+          const activeUsers = Math.round(totalHolders * (0.15 + mi * 0.03 + rng() * 0.08));
+          const rate = ((activeUsers / totalHolders) * 100).toFixed(1);
+          rows.push({ month, product: prod, activeUsers, totalHolders, rate });
+        });
       });
-      document.querySelector(`[data-tab="${tab}"]`).classList.remove('tab-inactive');
-      document.querySelector(`[data-tab="${tab}"]`).classList.add('tab-active');
-      currentTab = tab;
-      renderTab(tab);
+      return rows;
+    };
+
+    // ═══════════════════════════════════════════════
+    // PURE SVG CHART COMPONENTS (no external library)
+    // ═══════════════════════════════════════════════
+
+    function SimpleBarChart({ data, dataKey, labelKey, fill, width = "100%", height = 260, layout = "vertical", unit = "" }) {
+      const maxVal = Math.max(...data.map(d => d[dataKey]));
+      const padding = { top: 20, right: 50, bottom: 30, left: layout === "vertical" ? 120 : 40 };
+      const svgH = height;
+      const svgW = 560;
+      const chartW = svgW - padding.left - padding.right;
+      const chartH = svgH - padding.top - padding.bottom;
+
+      if (layout === "vertical") {
+        const barH = Math.min(28, (chartH - data.length * 4) / data.length);
+        return (
+          <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: "100%", height: height }}>
+            {data.map((d, i) => {
+              const y = padding.top + i * (barH + 4);
+              const w = maxVal > 0 ? (d[dataKey] / maxVal) * chartW : 0;
+              return (
+                <g key={i}>
+                  <text x={padding.left - 8} y={y + barH / 2 + 4} textAnchor="end" fontSize="11" fill={COLORS.text}>{d[labelKey]}</text>
+                  <rect x={padding.left} y={y} width={w} height={barH} rx="4" fill={typeof fill === "function" ? fill(d, i) : fill} />
+                  <text x={padding.left + w + 6} y={y + barH / 2 + 4} fontSize="11" fill={COLORS.muted}>{d[dataKey].toLocaleString()}{unit}</text>
+                </g>
+              );
+            })}
+          </svg>
+        );
+      }
+
+      // Normal (vertical bars) layout
+      const barW = Math.min(40, (chartW - data.length * 6) / data.length);
+      const gap = (chartW - data.length * barW) / (data.length + 1);
+      return (
+        <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: "100%", height: height }}>
+          {[0, 0.25, 0.5, 0.75, 1].map((frac, i) => (
+            <g key={i}>
+              <line x1={padding.left} x2={svgW - padding.right} y1={padding.top + chartH * (1 - frac)} y2={padding.top + chartH * (1 - frac)} stroke="#E2E8F0" strokeDasharray="3 3" />
+              <text x={padding.left - 6} y={padding.top + chartH * (1 - frac) + 4} textAnchor="end" fontSize="10" fill={COLORS.muted}>{Math.round(maxVal * frac).toLocaleString()}</text>
+            </g>
+          ))}
+          {data.map((d, i) => {
+            const x = padding.left + gap + i * (barW + gap);
+            const h = maxVal > 0 ? (d[dataKey] / maxVal) * chartH : 0;
+            const y = padding.top + chartH - h;
+            return (
+              <g key={i}>
+                <rect x={x} y={y} width={barW} height={h} rx="4" fill={typeof fill === "function" ? fill(d, i) : fill} />
+                <text x={x + barW / 2} y={svgH - 8} textAnchor="middle" fontSize="10" fill={COLORS.text}>{d[labelKey]}</text>
+              </g>
+            );
+          })}
+        </svg>
+      );
     }
 
-    // ── Render functions ──
-    function renderTab(tab) {
-      const p = document.getElementById('productFilter').value;
-      const d = kpiData[p];
-      if (tab === 'overview') renderOverview(d);
-      else if (tab === 'pages') renderPages();
-      else if (tab === 'attribution') renderAttribution();
-      else if (tab === 'conversions') renderConversions();
+    function SimpleLineChart({ data, dataKeys, colors, labelKey, width = "100%", height = 260, unit = "" }) {
+      const allVals = dataKeys.flatMap(k => data.map(d => d[k]));
+      const maxVal = Math.max(...allVals);
+      const minVal = Math.min(0, Math.min(...allVals));
+      const range = maxVal - minVal || 1;
+      const padding = { top: 20, right: 20, bottom: 35, left: 50 };
+      const svgW = 560;
+      const svgH = height;
+      const chartW = svgW - padding.left - padding.right;
+      const chartH = svgH - padding.top - padding.bottom;
+
+      const getX = (i) => padding.left + (i / (data.length - 1)) * chartW;
+      const getY = (val) => padding.top + chartH - ((val - minVal) / range) * chartH;
+
+      return (
+        <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: "100%", height: height }}>
+          {[0, 0.25, 0.5, 0.75, 1].map((frac, i) => {
+            const val = minVal + range * frac;
+            return (
+              <g key={i}>
+                <line x1={padding.left} x2={svgW - padding.right} y1={getY(val)} y2={getY(val)} stroke="#E2E8F0" strokeDasharray="3 3" />
+                <text x={padding.left - 6} y={getY(val) + 4} textAnchor="end" fontSize="10" fill={COLORS.muted}>{Math.round(val)}{unit}</text>
+              </g>
+            );
+          })}
+          {data.map((d, i) => (
+            <text key={i} x={getX(i)} y={svgH - 8} textAnchor="middle" fontSize="10" fill={COLORS.text}>{d[labelKey]}</text>
+          ))}
+          {dataKeys.map((key, ki) => {
+            const points = data.map((d, i) => `${getX(i)},${getY(d[key])}`).join(" ");
+            return (
+              <g key={ki}>
+                <polyline points={points} fill="none" stroke={colors[ki]} strokeWidth="2.5" strokeLinejoin="round" />
+                {data.map((d, i) => (
+                  <circle key={i} cx={getX(i)} cy={getY(d[key])} r="3.5" fill={colors[ki]} stroke={COLORS.white} strokeWidth="1.5" />
+                ))}
+              </g>
+            );
+          })}
+        </svg>
+      );
     }
 
-    function updateDashboard() { renderTab(currentTab); }
+    function SimplePieChart({ data, size = 180 }) {
+      const total = data.reduce((s, d) => s + d.value, 0);
+      const cx = size / 2, cy = size / 2, r = size * 0.38, ir = size * 0.24;
+      let cumAngle = -Math.PI / 2;
+      const slices = data.map(d => {
+        const angle = (d.value / total) * 2 * Math.PI;
+        const startAngle = cumAngle;
+        cumAngle += angle;
+        const endAngle = cumAngle;
+        const x1o = cx + r * Math.cos(startAngle), y1o = cy + r * Math.sin(startAngle);
+        const x2o = cx + r * Math.cos(endAngle), y2o = cy + r * Math.sin(endAngle);
+        const x1i = cx + ir * Math.cos(endAngle), y1i = cy + ir * Math.sin(endAngle);
+        const x2i = cx + ir * Math.cos(startAngle), y2i = cy + ir * Math.sin(startAngle);
+        const large = angle > Math.PI ? 1 : 0;
+        const path = `M${x1o},${y1o} A${r},${r} 0 ${large} 1 ${x2o},${y2o} L${x1i},${y1i} A${ir},${ir} 0 ${large} 0 ${x2i},${y2i} Z`;
+        return { ...d, path, pct: ((d.value / total) * 100).toFixed(1) };
+      });
+      return (
+        <svg viewBox={`0 0 ${size} ${size}`} style={{ width: size, height: size }}>
+          {slices.map((s, i) => (
+            <path key={i} d={s.path} fill={s.color} stroke={COLORS.white} strokeWidth="2" />
+          ))}
+          <text x={cx} y={cy - 6} textAnchor="middle" fontSize="18" fontWeight="700" fill={COLORS.primary}>{total.toLocaleString()}</text>
+          <text x={cx} y={cy + 10} textAnchor="middle" fontSize="9" fill={COLORS.muted}>total users</text>
+        </svg>
+      );
+    }
 
-    function renderOverview(d) {
-      const el = document.getElementById('tab-overview');
-      el.innerHTML = `
-        <div class="space-y-6">
-          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            ${kpiCard('Portal Engagement', d.engagement + '%', 'of ' + d.totalHolders.toLocaleString() + ' holders', 1.5)}
-            ${kpiCard('Active Users', d.activeUsers.toLocaleString(), 'this month', 2.1)}
-            ${kpiCard('New Accounts', d.newAccounts, 'this month', -3.2)}
-            ${kpiCard('Multi-Page Rate', d.multiPage + '%', '2+ pages visited', 4.8)}
-            ${kpiCard('Logins/User', d.loginsPerUser, 'avg this month')}
-            ${kpiCard('Top Page', 'Home', '75% engagement')}
-          </div>
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white rounded-lg p-4 shadow-sm border">
-              <h3 class="font-semibold mb-4">Portal Engagement Trend</h3>
-              <canvas id="chartTrend"></canvas>
+    function SimpleStackedBarChart({ data, stackKeys, stackColors, labelKey, height = 300 }) {
+      const maxVal = Math.max(...data.map(d => stackKeys.reduce((s, k) => s + (d[k] || 0), 0)));
+      const padding = { top: 20, right: 20, bottom: 35, left: 50 };
+      const svgW = 560;
+      const svgH = height;
+      const chartW = svgW - padding.left - padding.right;
+      const chartH = svgH - padding.top - padding.bottom;
+      const barW = Math.min(50, (chartW - data.length * 8) / data.length);
+      const gap = (chartW - data.length * barW) / (data.length + 1);
+
+      return (
+        <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: "100%", height: height }}>
+          {[0, 0.25, 0.5, 0.75, 1].map((frac, i) => (
+            <g key={i}>
+              <line x1={padding.left} x2={svgW - padding.right} y1={padding.top + chartH * (1 - frac)} y2={padding.top + chartH * (1 - frac)} stroke="#E2E8F0" strokeDasharray="3 3" />
+              <text x={padding.left - 6} y={padding.top + chartH * (1 - frac) + 4} textAnchor="end" fontSize="10" fill={COLORS.muted}>{Math.round(maxVal * frac).toLocaleString()}</text>
+            </g>
+          ))}
+          {data.map((d, i) => {
+            const x = padding.left + gap + i * (barW + gap);
+            let cumH = 0;
+            return (
+              <g key={i}>
+                {stackKeys.map((k, ki) => {
+                  const val = d[k] || 0;
+                  const h = maxVal > 0 ? (val / maxVal) * chartH : 0;
+                  const y = padding.top + chartH - cumH - h;
+                  cumH += h;
+                  return <rect key={ki} x={x} y={y} width={barW} height={h} fill={stackColors[ki]} rx={ki === stackKeys.length - 1 ? "4" : "0"} />;
+                })}
+                <text x={x + barW / 2} y={svgH - 8} textAnchor="middle" fontSize="9" fill={COLORS.text}>{d[labelKey]}</text>
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+
+    function ChartLegend({ items }) {
+      return (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center", marginTop: 8 }}>
+          {items.map((item, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: COLORS.text }}>
+              <div style={{ width: 10, height: 10, borderRadius: 2, background: item.color, flexShrink: 0 }} />
+              {item.label}
             </div>
-            <div class="bg-white rounded-lg p-4 shadow-sm border">
-              <h3 class="font-semibold mb-4">Page Engagement Rate</h3>
-              <canvas id="chartPageEng"></canvas>
-            </div>
-          </div>
-        </div>`;
-      makeChart('chartTrend', {
-        type: 'line',
-        data: { labels: trendMonths, datasets: [{ label: 'Engagement %', data: trendEngagement, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3, pointRadius: 4 }] },
-        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 20, ticks: { callback: v => v + '%' } } } }
-      });
-      makeChart('chartPageEng', {
-        type: 'bar',
-        data: { labels: pageLabels, datasets: [{ label: 'Engagement %', data: pageEngagement, backgroundColor: '#3b82f6', borderRadius: 4 }] },
-        options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { min: 0, max: 100, ticks: { callback: v => v + '%' } } } }
-      });
+          ))}
+        </div>
+      );
     }
 
-    function renderPages() {
-      const el = document.getElementById('tab-pages');
-      el.innerHTML = `
-        <div class="space-y-6">
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            ${kpiCard('Total Page Views', '13,690', 'this month')}
-            ${kpiCard('Unique Visitors', '3,480', 'distinct users')}
-            ${kpiCard('Avg Pages/Session', '2.4', 'pages viewed')}
-            ${kpiCard('Most Visited', 'Home', '4,820 views')}
+    // ── UI Components ──
+    function KPITile({ label, value, subvalue, trend, color = COLORS.accent }) {
+      const isUp = trend >= 0;
+      return (
+        <div style={{
+          background: COLORS.white,
+          borderRadius: 10,
+          padding: "20px 22px",
+          border: `1px solid ${COLORS.border}`,
+          flex: "1 1 0",
+          minWidth: 160,
+        }}>
+          <div style={{ fontSize: 12, color: COLORS.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: COLORS.primary, marginTop: 6 }}>{value}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+            {trend !== undefined && (
+              <span style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: isUp ? COLORS.success : COLORS.danger,
+                background: isUp ? "#ECFDF5" : "#FEF2F2",
+                padding: "2px 8px",
+                borderRadius: 12,
+              }}>
+                {isUp ? "+" : ""}{trend}%
+              </span>
+            )}
+            {subvalue && <span style={{ fontSize: 12, color: COLORS.muted }}>{subvalue}</span>}
           </div>
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white rounded-lg p-4 shadow-sm border">
-              <h3 class="font-semibold mb-4">Page Views by Page</h3>
-              <canvas id="chartPageViews"></canvas>
-            </div>
-            <div class="bg-white rounded-lg p-4 shadow-sm border">
-              <h3 class="font-semibold mb-4">Unique Visitors by Page</h3>
-              <canvas id="chartVisitors"></canvas>
-            </div>
-          </div>
-        </div>`;
-      makeChart('chartPageViews', {
-        type: 'bar',
-        data: { labels: pageLabels, datasets: [{ label: 'Page Views', data: pageViews, backgroundColor: '#3b82f6', borderRadius: 4 }] },
-        options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } } }
-      });
-      makeChart('chartVisitors', {
-        type: 'bar',
-        data: { labels: pageLabels, datasets: [{ label: 'Unique Visitors', data: pageVisitors, backgroundColor: '#22c55e', borderRadius: 4 }] },
-        options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } } }
-      });
+        </div>
+      );
     }
 
-    function renderAttribution() {
-      const el = document.getElementById('tab-attribution');
-      const rows = attrProducts.map((p, i) => `<tr class="border-b last:border-0">
-        <td class="py-2 px-3 font-medium">${p}</td>
-        <td class="py-2 px-3 text-right">${attrSessions[i].toLocaleString()}</td>
-        <td class="py-2 px-3 text-right">${attrMulti[i]}</td>
-        <td class="py-2 px-3">${attrTopPage[i]}</td>
-      </tr>`).join('');
-      el.innerHTML = `
-        <div class="space-y-6">
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            ${kpiCard('Multi-Product Users', '562', 'own 2+ products')}
-            ${kpiCard('Multi-Product Rate', '16.2%', 'of all visitors')}
-            ${kpiCard('Top Referrer', 'Adaware', '1,580 sessions')}
-            ${kpiCard('Total Sessions', '4,420', 'this month')}
-          </div>
-          <div class="bg-white rounded-lg p-4 shadow-sm border">
-            <h3 class="font-semibold mb-4">Sessions by Referrer Product</h3>
-            <canvas id="chartAttrSessions"></canvas>
-          </div>
-          <div class="bg-white rounded-lg p-4 shadow-sm border overflow-x-auto">
-            <h3 class="font-semibold mb-4">Attribution Detail</h3>
-            <table class="w-full text-sm">
-              <thead><tr class="border-b">
-                <th class="text-left py-2 px-3">Product</th>
-                <th class="text-right py-2 px-3">Sessions</th>
-                <th class="text-right py-2 px-3">Multi-Product Users</th>
-                <th class="text-left py-2 px-3">Top Page</th>
-              </tr></thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>
-        </div>`;
-      makeChart('chartAttrSessions', {
-        type: 'bar',
-        data: { labels: attrProducts, datasets: [{ label: 'Sessions', data: attrSessions, backgroundColor: '#3b82f6', borderRadius: 4 }] },
-        options: { responsive: true, plugins: { legend: { display: false } } }
-      });
+    function SectionHeader({ title, subtitle }) {
+      return (
+        <div style={{ marginBottom: 16, marginTop: 32 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: COLORS.primary, margin: 0 }}>{title}</h2>
+          {subtitle && <p style={{ fontSize: 13, color: COLORS.muted, margin: "4px 0 0" }}>{subtitle}</p>}
+        </div>
+      );
     }
 
-    function renderConversions() {
-      const el = document.getElementById('tab-conversions');
-      const funnelBars = funnelValues.map((v, i) => {
-        const pct = (v / funnelValues[0] * 100).toFixed(1);
-        const dropoff = i > 0 ? ((funnelValues[i-1] - v) / funnelValues[i-1] * 100).toFixed(1) : null;
-        return `<div>
-          <div class="flex justify-between text-sm mb-1"><span>${funnelLabels[i]}</span><span class="font-medium">${v.toLocaleString()}</span></div>
-          <div class="h-8 bg-gray-100 rounded overflow-hidden relative">
-            <div class="h-full rounded" style="width:${pct}%;background:${funnelColors[i]}"></div>
-            ${dropoff ? `<span class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">-${dropoff}% dropoff</span>` : ''}
+    function TabBar({ tabs, active, onChange }) {
+      return (
+        <div style={{ display: "flex", gap: 0, borderBottom: `2px solid ${COLORS.border}`, marginBottom: 24 }}>
+          {tabs.map((t) => (
+            <button
+              key={t}
+              onClick={() => onChange(t)}
+              style={{
+                padding: "10px 20px",
+                border: "none",
+                borderBottom: active === t ? `2px solid ${COLORS.accent}` : "2px solid transparent",
+                background: "none",
+                color: active === t ? COLORS.accent : COLORS.muted,
+                fontWeight: active === t ? 700 : 500,
+                fontSize: 14,
+                cursor: "pointer",
+                marginBottom: -2,
+                transition: "all 0.15s",
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    function Card({ children, style = {} }) {
+      return (
+        <div style={{
+          background: COLORS.white,
+          borderRadius: 10,
+          border: `1px solid ${COLORS.border}`,
+          padding: 20,
+          ...style,
+        }}>
+          {children}
+        </div>
+      );
+    }
+
+    // ── Pill Toggle (for granularity & page selector) ──
+    function PillToggle({ options, selected, onChange, multi = false }) {
+      return (
+        <div style={{ display: "flex", gap: 0, background: "#F1F5F9", borderRadius: 8, padding: 3, flexWrap: "wrap" }}>
+          {options.map((opt) => {
+            const isActive = multi ? selected.includes(opt) : selected === opt;
+            return (
+              <button
+                key={opt}
+                onClick={() => {
+                  if (multi) {
+                    if (opt === "All") {
+                      onChange(["All"]);
+                    } else {
+                      let next = selected.includes(opt)
+                        ? selected.filter(s => s !== opt)
+                        : [...selected.filter(s => s !== "All"), opt];
+                      if (next.length === 0) next = ["All"];
+                      onChange(next);
+                    }
+                  } else {
+                    onChange(opt);
+                  }
+                }}
+                style={{
+                  padding: "6px 14px",
+                  border: "none",
+                  borderRadius: 6,
+                  background: isActive ? COLORS.white : "transparent",
+                  color: isActive ? COLORS.accent : COLORS.muted,
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize: 12,
+                  cursor: "pointer",
+                  boxShadow: isActive ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                  transition: "all 0.15s",
+                }}
+              >
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // ── Three-Tier Engagement Model Card ──
+    function ThreeTierCard({ engagementPct, pageEngagementTop, multiPagePct }) {
+      const tiers = [
+        {
+          tier: "1. Reach",
+          metric: "Portal Engagement Rate",
+          value: `${engagementPct}%`,
+          desc: "% of account holders visiting the portal",
+          color: "#2E75B6",
+          bg: "#EFF6FF",
+        },
+        {
+          tier: "2. Depth",
+          metric: "Page Engagement Rate",
+          value: pageEngagementTop,
+          desc: "Which pages have traction (top page shown)",
+          color: "#27AE60",
+          bg: "#ECFDF5",
+        },
+        {
+          tier: "3. Intent",
+          metric: "Multi-Page Engagement Rate",
+          value: `${multiPagePct}%`,
+          desc: "Users visiting 2+ pages (cross-sell signal)",
+          color: "#F39C12",
+          bg: "#FFFBEB",
+        },
+      ];
+      return (
+        <Card style={{ marginTop: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 4px" }}>Three-Tier Engagement Model</h3>
+          <p style={{ fontSize: 12, color: COLORS.muted, margin: "0 0 16px" }}>Progressively deeper signals for monetization readiness</p>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            {tiers.map((t, i) => (
+              <div key={i} style={{
+                flex: "1 1 0",
+                minWidth: 200,
+                background: t.bg,
+                borderRadius: 10,
+                padding: "16px 20px",
+                borderLeft: `4px solid ${t.color}`,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: t.color, textTransform: "uppercase", letterSpacing: 0.5 }}>{t.tier}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, marginTop: 4 }}>{t.metric}</div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: COLORS.primary, marginTop: 6 }}>{t.value}</div>
+                <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4 }}>{t.desc}</div>
+              </div>
+            ))}
           </div>
-        </div>`;
-      }).join('');
+        </Card>
+      );
+    }
 
-      const srcRows = srcData.map((r, i) => `<tr class="border-b last:border-0">
-        <td class="py-2 px-3 font-medium"><span class="w-3 h-3 rounded-full inline-block mr-2" style="background:${COLORS[i]}"></span>${r.source}</td>
-        <td class="py-2 px-3 text-right">${r.sessions.toLocaleString()}</td>
-        <td class="py-2 px-3 text-right">${r.clicks}</td>
-        <td class="py-2 px-3 text-right">${r.conversions}</td>
-        <td class="py-2 px-3 text-right">${r.rate}</td>
-        <td class="py-2 px-3 text-right">${r.revenue}</td>
-      </tr>`).join('');
+    // ── Main Dashboard ──
+    function Dashboard() {
+      const [selectedProduct, setSelectedProduct] = useState("All Products");
+      const [activeTab, setActiveTab] = useState("Overview");
+      const [granularity, setGranularity] = useState("Monthly");
+      const [selectedPages, setSelectedPages] = useState(["All"]);
 
-      const revRows = revData.map((r, i) => `<tr class="border-b last:border-0">
-        <td class="py-2 px-3 font-medium"><span class="w-3 h-3 rounded-full inline-block mr-2" style="background:${COLORS[i]}"></span>${r.name}</td>
-        <td class="py-2 px-3 text-right font-medium">${r.total}</td>
-        <td class="py-2 px-3 text-right text-green-600">${r.upsell}</td>
-        <td class="py-2 px-3 text-right text-blue-600">${r.cross}</td>
-      </tr>`).join('');
+      const trendData = useMemo(() => generateTrendData(selectedProduct, granularity), [selectedProduct, granularity]);
+      const pageViewData = useMemo(() => generatePageViewData(selectedProduct), [selectedProduct]);
+      const pageTrendData = useMemo(() => generatePageTrendData(selectedProduct, granularity), [selectedProduct, granularity]);
+      const comparisonData = useMemo(() => generateComparisonData(), []);
 
-      el.innerHTML = `
-        <div class="space-y-6">
-          <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
-            <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      const rng = seededRandom(selectedProduct.length * 3 + 11);
+      const mult = selectedProduct === "All Products" ? 1 : 0.22 + rng() * 0.1;
+      const totalUsers = Math.round(7040 * mult);
+      const newAccounts = Math.round(1280 * mult);
+      const logins = Math.round(12400 * mult);
+      const engagementPct = selectedProduct === "All Products" ? 28.4 : +(15 + rng() * 20).toFixed(1);
+      const multiPagePct = selectedProduct === "All Products" ? 42.3 : +(30 + rng() * 20).toFixed(1);
+      const loginsPerUser = selectedProduct === "All Products" ? 1.76 : +(1.2 + rng() * 0.8).toFixed(2);
+      const totalAccountHolders = selectedProduct === "All Products" ? 24800 : Math.round(24800 * (0.1 + rng() * 0.2));
+      const totalPageViews = pageViewData.reduce((s, d) => s + d.views, 0);
+      const avgPagesPerSession = (totalPageViews / (logins || 1)).toFixed(1);
+      const sortedPages = [...pageViewData].sort((a, b) => b.views - a.views);
+      const mostVisitedPage = sortedPages[0]?.page || "Home";
+
+      // Page engagement data for three-tier card
+      const pageEngTop = sortedPages[0] ? `${((sortedPages[0].uniqueVisitors / (totalUsers || 1)) * 100).toFixed(1)}%` : "N/A";
+
+      const productAdoptionData = useMemo(() => {
+        const rng2 = seededRandom(101);
+        return PRODUCTS.filter(p => p !== "All Products").map(p => ({
+          product: p,
+          rate: +(15 + rng2() * 25).toFixed(1),
+        }));
+      }, []);
+
+      // Filtered comparison data
+      const filteredComparison = useMemo(() => {
+        if (selectedProduct === "All Products") return comparisonData;
+        return comparisonData.filter(r => r.product === selectedProduct);
+      }, [selectedProduct, comparisonData]);
+
+      const PAGE_LINE_COLORS = ["#1B3A5C", "#2E75B6", "#27AE60", "#F39C12", "#9B59B6", "#E74C3C"];
+      const PAGE_NAMES = ["Home", "Manage Products", "Subscriptions", "Payment Info", "Manage Account", "Security & Privacy"];
+      const STACK_KEYS = ["home", "products", "subscriptions", "billing", "account", "security"];
+      const STACK_COLORS = ["#1B3A5C", "#2E75B6", "#27AE60", "#F39C12", "#9B59B6", "#E74C3C"];
+      const STACK_LABELS = ["Home", "Products", "Subscriptions", "Billing", "Account", "Security"];
+
+      // Page filter logic for Page Navigation tab
+      const filteredPageViewData = useMemo(() => {
+        if (selectedPages.includes("All")) return pageViewData;
+        return pageViewData.filter(d => selectedPages.includes(d.page));
+      }, [pageViewData, selectedPages]);
+
+      const filteredPageTrendKeys = useMemo(() => {
+        if (selectedPages.includes("All")) return PAGE_NAMES;
+        return PAGE_NAMES.filter(n => selectedPages.includes(n));
+      }, [selectedPages]);
+
+      const filteredPageTrendColors = useMemo(() => {
+        if (selectedPages.includes("All")) return PAGE_LINE_COLORS;
+        return PAGE_NAMES.map((n, i) => ({ name: n, color: PAGE_LINE_COLORS[i] }))
+          .filter(x => selectedPages.includes(x.name))
+          .map(x => x.color);
+      }, [selectedPages]);
+
+      return (
+        <div style={{ background: "#F1F5F9", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+          {/* Header */}
+          <div style={{
+            background: COLORS.primary,
+            padding: "20px 32px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 12,
+          }}>
             <div>
-              <p class="font-medium text-amber-800">Tracking Events Required</p>
-              <p class="text-sm text-amber-700 mt-1">This tab shows placeholder data. To display real conversions, the tracking team needs to implement:
-                <code class="bg-amber-100 px-1 rounded mx-1">cta_impression</code>,
-                <code class="bg-amber-100 px-1 rounded mx-1">cta_click</code>,
-                <code class="bg-amber-100 px-1 rounded mx-1">purchase_complete</code>, and
-                <code class="bg-amber-100 px-1 rounded mx-1">traffic_source</code> events.</p>
+              <h1 style={{ color: COLORS.white, fontSize: 22, fontWeight: 700, margin: 0 }}>MyAccount BI Dashboard</h1>
+              <span style={{ color: "#94A3B8", fontSize: 13 }}>V1 Prototype — Portal Engagement, Page Navigation & User Attribution</span>
             </div>
-          </div>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            ${kpiCard('Conversion Rate', '13.5%', 'clicks → purchase', 2.3)}
-            ${kpiCard('Revenue Influenced', '$1,965', 'this month', 8.4)}
-            ${kpiCard('Upsells', '28', 'completed')}
-            ${kpiCard('Cross-Sells', '14', 'completed')}
-          </div>
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white rounded-lg p-4 shadow-sm border">
-              <h3 class="font-semibold mb-4">Conversion Funnel</h3>
-              <div class="space-y-3">${funnelBars}</div>
-            </div>
-            <div class="bg-white rounded-lg p-4 shadow-sm border">
-              <h3 class="font-semibold mb-4">Conversion Rate by Page</h3>
-              <canvas id="chartConvRate"></canvas>
-            </div>
-          </div>
-          <div class="bg-white rounded-lg p-4 shadow-sm border">
-            <h3 class="font-semibold mb-4">Conversions by Traffic Source</h3>
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div class="lg:col-span-1"><canvas id="chartSrcPie"></canvas></div>
-              <div class="lg:col-span-2 overflow-x-auto">
-                <table class="w-full text-sm">
-                  <thead><tr class="border-b">
-                    <th class="text-left py-2 px-3">Source</th>
-                    <th class="text-right py-2 px-3">Sessions</th>
-                    <th class="text-right py-2 px-3">CTA Clicks</th>
-                    <th class="text-right py-2 px-3">Conversions</th>
-                    <th class="text-right py-2 px-3">Conv. Rate</th>
-                    <th class="text-right py-2 px-3">Revenue</th>
-                  </tr></thead>
-                  <tbody>${srcRows}</tbody>
-                </table>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              {/* Granularity Toggle */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ color: "#94A3B8", fontSize: 12, fontWeight: 600 }}>PERIOD:</span>
+                <div style={{ display: "flex", gap: 0, background: "#1E293B", borderRadius: 8, padding: 3 }}>
+                  {GRANULARITY_OPTIONS.map((g) => (
+                    <button
+                      key={g}
+                      onClick={() => setGranularity(g)}
+                      style={{
+                        padding: "6px 14px",
+                        border: "none",
+                        borderRadius: 6,
+                        background: granularity === g ? "#475569" : "transparent",
+                        color: granularity === g ? COLORS.white : "#94A3B8",
+                        fontWeight: granularity === g ? 700 : 500,
+                        fontSize: 12,
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Product Toggle */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ color: "#94A3B8", fontSize: 12, fontWeight: 600 }}>PRODUCT:</span>
+                <select
+                  value={selectedProduct}
+                  onChange={(e) => setSelectedProduct(e.target.value)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 8,
+                    border: "1px solid #475569",
+                    background: "#1E293B",
+                    color: COLORS.white,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    minWidth: 160,
+                  }}
+                >
+                  {PRODUCTS.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
-          <div class="bg-white rounded-lg p-4 shadow-sm border">
-            <h3 class="font-semibold mb-4">Revenue by Product</h3>
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div class="lg:col-span-1"><canvas id="chartRevPie"></canvas></div>
-              <div class="lg:col-span-2 overflow-x-auto">
-                <table class="w-full text-sm">
-                  <thead><tr class="border-b">
-                    <th class="text-left py-2 px-3">Product</th>
-                    <th class="text-right py-2 px-3">Total Revenue</th>
-                    <th class="text-right py-2 px-3">Upsells</th>
-                    <th class="text-right py-2 px-3">Cross-Sells</th>
-                  </tr></thead>
-                  <tbody>${revRows}</tbody>
-                </table>
-              </div>
-            </div>
+
+          {/* Tab Navigation */}
+          <div style={{ padding: "0 32px", background: COLORS.white, borderBottom: `1px solid ${COLORS.border}` }}>
+            <TabBar
+              tabs={["Overview", "Page Navigation", "User Attribution"]}
+              active={activeTab}
+              onChange={setActiveTab}
+            />
           </div>
-        </div>`;
-      makeChart('chartConvRate', {
-        type: 'bar',
-        data: { labels: convPages, datasets: [{ label: 'Conv. Rate %', data: convRates, backgroundColor: '#22c55e', borderRadius: 4 }] },
-        options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { min: 0, max: 4, ticks: { callback: v => v + '%' } } } }
-      });
-      makeChart('chartSrcPie', {
-        type: 'doughnut',
-        data: { labels: srcLabels, datasets: [{ data: srcConversions, backgroundColor: COLORS }] },
-        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
-      });
-      makeChart('chartRevPie', {
-        type: 'doughnut',
-        data: { labels: revData.map(r => r.name), datasets: [{ data: revData.map(r => r.value), backgroundColor: COLORS }] },
-        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } }, tooltip: { callbacks: { label: ctx => ' $' + ctx.parsed } } } }
-      });
+
+          {/* Content */}
+          <div style={{ padding: "24px 32px", maxWidth: 1280, margin: "0 auto" }}>
+
+            {/* ═══════════ OVERVIEW TAB ═══════════ */}
+            {activeTab === "Overview" && (
+              <>
+                <SectionHeader title="Portal Engagement KPIs" subtitle={`Showing: ${selectedProduct} | Period: ${granularity} | Portal Engagement = page-viewing users / total account holders`} />
+                {/* Info banner */}
+                <div style={{
+                  background: "#EFF6FF",
+                  border: "1px solid #BFDBFE",
+                  borderRadius: 8,
+                  padding: "12px 16px",
+                  marginBottom: 20,
+                  fontSize: 13,
+                  color: "#1E40AF",
+                  lineHeight: 1.5,
+                }}>
+                  <strong>Portal Engagement Rate</strong> = unique users (distinct user IDs) who viewed ≥1 page in MyAccount / total account holders.
+                  Login-based adoption is ~100% (users must log in to use purchased products), so we measure page-view engagement instead.
+                  All metrics deduplicated at user level per {granularity.toLowerCase()} period.
+                </div>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                  <KPITile label="Portal Engagement Rate" value={`${engagementPct}%`} subvalue={`${totalUsers.toLocaleString()} of ${totalAccountHolders.toLocaleString()} acct holders`} trend={4.2} />
+                  <KPITile label="Active Users" value={totalUsers.toLocaleString()} subvalue="viewed ≥1 page" trend={8.1} />
+                  <KPITile label="New Accounts" value={newAccounts.toLocaleString()} trend={12.3} />
+                  <KPITile label="Multi-Page Rate" value={`${multiPagePct}%`} subvalue="visited 2+ pages" trend={5.6} />
+                  <KPITile label="Logins / User" value={loginsPerUser} trend={-0.8} />
+                  <KPITile label="Most Visited Page" value={mostVisitedPage} />
+                </div>
+
+                {/* Three-Tier Engagement Model */}
+                <ThreeTierCard
+                  engagementPct={engagementPct}
+                  pageEngagementTop={`${mostVisitedPage}: ${pageEngTop}`}
+                  multiPagePct={multiPagePct}
+                />
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 24 }}>
+                  <Card>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Portal Engagement Rate Over Time ({granularity})</h3>
+                    <SimpleLineChart
+                      data={trendData}
+                      dataKeys={["engagementRate"]}
+                      colors={[PRODUCT_COLORS[selectedProduct]]}
+                      labelKey="month"
+                      unit="%"
+                    />
+                  </Card>
+
+                  <Card>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>MyAccount Active Users Over Time ({granularity})</h3>
+                    <SimpleBarChart
+                      data={trendData}
+                      dataKey="users"
+                      labelKey="month"
+                      fill={PRODUCT_COLORS[selectedProduct]}
+                      layout="normal"
+                    />
+                  </Card>
+                </div>
+
+                {/* Page Engagement Breakdown */}
+                <Card style={{ marginTop: 20 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 4px" }}>Page Engagement Rate by Page</h3>
+                  <p style={{ fontSize: 12, color: COLORS.muted, margin: "0 0 16px" }}>Of MyAccount visitors, what % visit each page? (Critical for monetization placement decisions)</p>
+                  <SimpleBarChart
+                    data={pageViewData.map(d => ({
+                      page: d.page,
+                      rate: +((d.uniqueVisitors / (totalUsers || 1)) * 100).toFixed(1),
+                    })).sort((a, b) => b.rate - a.rate)}
+                    dataKey="rate"
+                    labelKey="page"
+                    fill={PRODUCT_COLORS[selectedProduct]}
+                    layout="vertical"
+                    height={260}
+                    unit="%"
+                  />
+                </Card>
+
+                {/* Portal Engagement Rate by Product — only when All Products */}
+                {selectedProduct === "All Products" && (
+                  <Card style={{ marginTop: 20 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Portal Engagement Rate by Product</h3>
+                    <SimpleBarChart
+                      data={productAdoptionData}
+                      dataKey="rate"
+                      labelKey="product"
+                      fill={(d) => PRODUCT_COLORS[d.product]}
+                      layout="vertical"
+                      height={220}
+                      unit="%"
+                    />
+                  </Card>
+                )}
+
+                {/* Comparison Table */}
+                <Card style={{ marginTop: 20 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 4px" }}>Monthly Comparison Table</h3>
+                  <p style={{ fontSize: 12, color: COLORS.muted, margin: "0 0 16px" }}>Month, Product, Active Users, Total Account Holders, Portal Engagement Rate %</p>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ borderBottom: `2px solid ${COLORS.border}` }}>
+                          {["Month", "Product", "Active Users", "Total Acct Holders", "Engagement Rate"].map((h) => (
+                            <th key={h} style={{ textAlign: "left", padding: "10px 12px", color: COLORS.muted, fontWeight: 600, fontSize: 11, textTransform: "uppercase" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredComparison.map((r, i) => (
+                          <tr key={i} style={{ borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 1 ? "#F8FAFC" : "transparent" }}>
+                            <td style={{ padding: "10px 12px" }}>{r.month}</td>
+                            <td style={{ padding: "10px 12px", fontWeight: 600 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <div style={{ width: 10, height: 10, borderRadius: 2, background: PRODUCT_COLORS[r.product] || COLORS.muted }} />
+                                {r.product}
+                              </div>
+                            </td>
+                            <td style={{ padding: "10px 12px" }}>{r.activeUsers.toLocaleString()}</td>
+                            <td style={{ padding: "10px 12px" }}>{r.totalHolders.toLocaleString()}</td>
+                            <td style={{ padding: "10px 12px", fontWeight: 700, color: COLORS.accent }}>{r.rate}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </>
+            )}
+
+            {/* ═══════════ PAGE NAVIGATION TAB ═══════════ */}
+            {activeTab === "Page Navigation" && (
+              <>
+                <SectionHeader title="Page Navigation Metrics" subtitle={`Showing: ${selectedProduct} | Period: ${granularity} — How users navigate MyAccount pages`} />
+
+                {/* Page Selector Filter */}
+                <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase" }}>Filter Pages:</span>
+                  <PillToggle
+                    options={["All", ...PAGE_NAMES]}
+                    selected={selectedPages}
+                    onChange={setSelectedPages}
+                    multi={true}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                  <KPITile label="Total Page Views" value={filteredPageViewData.reduce((s, d) => s + d.views, 0).toLocaleString()} trend={15.2} />
+                  <KPITile label="Unique Visitors / Page" value={Math.round(filteredPageViewData.reduce((s, d) => s + d.uniqueVisitors, 0) / (filteredPageViewData.length || 1)).toLocaleString()} subvalue="avg across pages" trend={9.4} />
+                  <KPITile label="Most Visited Page" value={mostVisitedPage} />
+                  <KPITile label="Avg Pages / Session" value={avgPagesPerSession} trend={3.1} />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 24 }}>
+                  <Card>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Page Views by Page</h3>
+                    <SimpleBarChart
+                      data={[...filteredPageViewData].sort((a, b) => b.views - a.views)}
+                      dataKey="views"
+                      labelKey="page"
+                      fill={PRODUCT_COLORS[selectedProduct]}
+                      layout="vertical"
+                      height={280}
+                    />
+                  </Card>
+
+                  <Card>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Unique Visitors by Page</h3>
+                    <SimpleBarChart
+                      data={[...filteredPageViewData].sort((a, b) => b.uniqueVisitors - a.uniqueVisitors)}
+                      dataKey="uniqueVisitors"
+                      labelKey="page"
+                      fill="#27AE60"
+                      layout="vertical"
+                      height={280}
+                    />
+                  </Card>
+                </div>
+
+                {/* Page Engagement Rate per Page */}
+                <Card style={{ marginTop: 20 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 4px" }}>Page Engagement Rate by Page</h3>
+                  <p style={{ fontSize: 12, color: COLORS.muted, margin: "0 0 16px" }}>Unique visitors to each page / total MyAccount visitors — which pages have traction?</p>
+                  <SimpleBarChart
+                    data={filteredPageViewData.map(d => ({
+                      page: d.page,
+                      rate: +((d.uniqueVisitors / (totalUsers || 1)) * 100).toFixed(1),
+                    })).sort((a, b) => b.rate - a.rate)}
+                    dataKey="rate"
+                    labelKey="page"
+                    fill={(d, i) => {
+                      const pageColors = ["#1B3A5C", "#2E75B6", "#27AE60", "#F39C12", "#9B59B6", "#E74C3C"];
+                      return pageColors[i % pageColors.length];
+                    }}
+                    layout="vertical"
+                    height={260}
+                    unit="%"
+                  />
+                </Card>
+
+                <Card style={{ marginTop: 20 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Page Views Over Time by Page ({granularity})</h3>
+                  <SimpleLineChart
+                    data={pageTrendData}
+                    dataKeys={filteredPageTrendKeys}
+                    colors={filteredPageTrendColors}
+                    labelKey="month"
+                    height={300}
+                  />
+                  <ChartLegend items={filteredPageTrendKeys.map((n, i) => ({ label: n, color: filteredPageTrendColors[i] }))} />
+                </Card>
+              </>
+            )}
+
+            {/* ═══════════ USER ATTRIBUTION TAB ═══════════ */}
+            {activeTab === "User Attribution" && (
+              <>
+                <SectionHeader title="User-Product Attribution" subtitle="Which products do MyAccount visitors own, and which product sent them here?" />
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                  <KPITile label="Multi-Product Users" value="2,220" subvalue="own 2+ products" trend={11.3} />
+                  <KPITile label="Multi-Product Rate" value="31.5%" subvalue="of all visitors" trend={5.8} />
+                  <KPITile label="Top Referrer" value="Adaware" subvalue="2,840 sessions" />
+                  <KPITile label="Total Sessions" value="8,260" trend={14.6} />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20, marginTop: 24 }}>
+                  <Card>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Sessions by Referrer Product</h3>
+                    <SimpleStackedBarChart
+                      data={referrerData}
+                      stackKeys={STACK_KEYS}
+                      stackColors={STACK_COLORS}
+                      labelKey="product"
+                      height={300}
+                    />
+                    <ChartLegend items={STACK_LABELS.map((l, i) => ({ label: l, color: STACK_COLORS[i] }))} />
+                  </Card>
+
+                  <Card>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Product Ownership Mix</h3>
+                    <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+                      <SimplePieChart data={multiProductData} />
+                    </div>
+                    <ChartLegend items={multiProductData.map(d => ({ label: `${d.name} (${d.value.toLocaleString()})`, color: d.color }))} />
+                  </Card>
+                </div>
+
+                {/* Product Summary Table */}
+                <Card style={{ marginTop: 20 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 16px" }}>Product Summary</h3>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ borderBottom: `2px solid ${COLORS.border}` }}>
+                          {["Product", "Total Users", "Page Views", "Sessions", "Top Page", "Avg Pages/Session"].map((h) => (
+                            <th key={h} style={{ textAlign: "left", padding: "10px 12px", color: COLORS.muted, fontWeight: 600, fontSize: 11, textTransform: "uppercase" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { p: "Adaware", users: "2,840", views: "8,520", sess: "2,840", top: "Home", avg: "3.0" },
+                          { p: "GameBuff", users: "1,920", views: "5,180", sess: "1,920", top: "Home", avg: "2.7" },
+                          { p: "InPixio", users: "1,560", views: "4,120", sess: "1,560", top: "Products", avg: "2.6" },
+                          { p: "CleanBuff", users: "980", views: "2,450", sess: "980", top: "Home", avg: "2.5" },
+                          { p: "Soda PDF", users: "640", views: "1,680", sess: "640", top: "Subscriptions", avg: "2.6" },
+                          { p: "PDF Suite", users: "320", views: "810", sess: "320", top: "Home", avg: "2.5" },
+                        ].map((r, i) => (
+                          <tr key={i} style={{ borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 1 ? "#F8FAFC" : "transparent" }}>
+                            <td style={{ padding: "10px 12px", fontWeight: 600 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <div style={{ width: 10, height: 10, borderRadius: 2, background: PRODUCT_COLORS[r.p] }} />
+                                {r.p}
+                              </div>
+                            </td>
+                            <td style={{ padding: "10px 12px" }}>{r.users}</td>
+                            <td style={{ padding: "10px 12px" }}>{r.views}</td>
+                            <td style={{ padding: "10px 12px" }}>{r.sess}</td>
+                            <td style={{ padding: "10px 12px" }}>{r.top}</td>
+                            <td style={{ padding: "10px 12px" }}>{r.avg}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+
+                {/* Attribution Drill-through Table */}
+                <Card style={{ marginTop: 20 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.primary, margin: "0 0 4px" }}>User Attribution Detail</h3>
+                  <p style={{ fontSize: 12, color: COLORS.muted, margin: "0 0 16px" }}>Drill-through: which user clicked what, from which product</p>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ borderBottom: `2px solid ${COLORS.border}` }}>
+                          {["User ID", "Products Owned", "Referrer Product", "Pages Visited", "Date"].map((h) => (
+                            <th key={h} style={{ textAlign: "left", padding: "10px 12px", color: COLORS.muted, fontWeight: 600, fontSize: 11, textTransform: "uppercase" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {attrTable.map((r, i) => (
+                          <tr key={i} style={{ borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 1 ? "#F8FAFC" : "transparent" }}>
+                            <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 12, color: COLORS.accent }}>{r.userId}</td>
+                            <td style={{ padding: "10px 12px" }}>
+                              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                                {r.products.split(", ").map((p, j) => (
+                                  <span key={j} style={{
+                                    background: "#EFF6FF",
+                                    color: COLORS.accent,
+                                    padding: "2px 8px",
+                                    borderRadius: 10,
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                  }}>{p}</span>
+                                ))}
+                              </div>
+                            </td>
+                            <td style={{ padding: "10px 12px" }}>
+                              <span style={{
+                                background: PRODUCT_COLORS[r.referrer] ? `${PRODUCT_COLORS[r.referrer]}18` : "#F1F5F9",
+                                color: PRODUCT_COLORS[r.referrer] || COLORS.text,
+                                padding: "2px 8px",
+                                borderRadius: 10,
+                                fontSize: 11,
+                                fontWeight: 600,
+                              }}>{r.referrer}</span>
+                            </td>
+                            <td style={{ padding: "10px 12px", fontSize: 12 }}>{r.pages}</td>
+                            <td style={{ padding: "10px 12px", color: COLORS.muted, fontSize: 12 }}>{r.date}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div style={{ textAlign: "center", padding: "24px 32px", color: COLORS.muted, fontSize: 12, borderTop: `1px solid ${COLORS.border}`, marginTop: 40 }}>
+            MyAccount BI Dashboard V1 Prototype — Data shown is illustrative (mock data) — Portal Engagement = distinct page-viewing user IDs / total account holders — Deduplication: user level per period — Prepared for stakeholder review
+          </div>
+        </div>
+      );
     }
 
-    // ── Init ──
-    renderOverview(kpiData['All Products']);
+    // Render the app
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<Dashboard />);
   </script>
 </body>
 </html>
